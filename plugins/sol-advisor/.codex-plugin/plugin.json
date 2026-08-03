@@ -1,7 +1,7 @@
 {
   "name": "sol-advisor",
-  "version": "0.4.0",
-  "description": "Codex-native architect workflow with a native Terra / High lane plus an explicit opt-in, user-visible Luna task lane, with primary-session verification and acceptance.",
+  "version": "0.5.0",
+  "description": "Codex-native architect workflow with a gpt-5.6-sol / medium primary, default user-visible GPT-5.6 Luna / Max subthreads through Codex app tools when available, layered PR dependency-graph execution for larger projects, and primary-session verification and acceptance; native execution and review remain governed by Sol Advisor's current shipped workflow.",
   "author": {"name": "Daniel McAteer", "url": "https://github.com/DannyMac180"},
   "homepage": "https://github.com/DannyMac180/sol-advisor#readme",
   "repository": "https://github.com/DannyMac180/sol-advisor",
@@ -10,12 +10,12 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Sol Advisor",
-    "shortDescription": "Orchestrate with Sol, use native Terra / High or opt-in Luna tasks, and verify the accepted diff.",
-    "longDescription": "Sol Advisor gives Codex two explicit delivery modes: GPT-5.6 Sol keeps architecture, decomposition, verification, and acceptance in the primary session; the native mode uses a separately installed GPT-5.6 Terra / High role and a fresh Sol reviewer, while the opt-in Luna mode creates user-visible GPT-5.6 Luna / Max tasks through list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread and keeps review, corrections, PR authorization, and dependent-stack ordering in the primary session.",
+    "shortDescription": "Run Sol / Medium with monitored Luna Max threads by default when available, or use the current native workflow, then verify and accept the diff.",
+    "longDescription": "Sol Advisor keeps architecture, decomposition, verification, layer acceptance, and the final decision in the primary gpt-5.6-sol / medium session. Plans have no plugin/global model or effort pin. When Codex app task tools and accepted GPT-5.6 Luna / Max routing are available, Sol creates and monitors each Luna Max child as a subagent-like, separate user-visible thread through list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread. Larger projects first record a PR dependency graph, then execute independent nodes in parallel by layer; each child reports its commit, diff, tests, and blockers, and Sol reviews, corrects, and submits or authorizes each accepted PR before the next dependent stack. Native execution and review routing remain governed by the current shipped Sol Advisor workflow and its exact companion roles sol_advisor_terra_implementer and sol_advisor_sol_reviewer.",
     "developerName": "Daniel McAteer",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
     "websiteURL": "https://github.com/DannyMac180/sol-advisor",
-    "defaultPrompt": ["Use Sol Advisor's native lane to build this feature, verify it, and obtain the fresh Sol review before completion.", "Use the Luna task lane only when I explicitly authorize it; create user-visible GPT-5.6 Luna / Max tasks through Codex app task tools and keep primary review and acceptance in this task."]
+    "defaultPrompt": ["Use Sol Advisor's orchestration workflow with a gpt-5.6-sol / medium primary; when app task tools and accepted Luna Max routing are available, create and monitor user-visible Luna threads by default, otherwise follow the current shipped native workflow, then verify and accept the diff.", "For a larger project, write the PR dependency graph first, run independent nodes in parallel by layer, require commit/diff/tests/blockers from every child, and review/correct/submit each accepted PR before the next dependent stack."]
   }
 }
