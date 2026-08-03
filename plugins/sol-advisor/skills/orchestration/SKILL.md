@@ -56,6 +56,13 @@ Before every delegation, complete steps 1-2. After spawning a lane, complete ste
    fresh task, and update Codex if the name remains unavailable. Do not substitute a
    built-in or similarly named role.
 
+Immediately after steps 1-2 and immediately before the native `spawn_agent` call,
+record the UTC cutoff used to distinguish this new rollout from an older reused path:
+
+~~~sh
+runtime_since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+~~~
+
 3. Treat exact templates plus observed runtime routing as an acceptance gate. Inspect
    public native spawn/details metadata first. It must identify the selected custom
    role. When it exposes model or effort, compare them with the role pin.
@@ -66,13 +73,17 @@ Before every delegation, complete steps 1-2. After spawning a lane, complete ste
    ~~~sh
    skill_dir=<directory-containing-this-SKILL.md>
    runtime_inspector="$skill_dir/../../scripts/inspect-agent-runtime.sh"
-   sh "$runtime_inspector" <native-subagent-thread-id>
+   # Capture the canonical /root/<task> path returned by the completed native spawn.
+   agent_path=<canonical-path-returned-by-spawn_agent>
+   # Reuse the runtime_since recorded immediately before that spawn.
+   sh "$runtime_inspector" --agent-path "$agent_path" --since "$runtime_since"
    ~~~
 
    The helper's allowlisted output is the authoritative local fallback for omitted
    model and effort. If public and local values both exist, they must agree. Accepted
    values are Terra / high for implementation and Sol / high for review. Missing,
    inconsistent, unavailable, or unobservable routing stops that lane.
+   Its positional lowercase UUID interface remains available for compatibility.
 
 4. For every Sol review, capture the observed sandbox policy type and permission
    profile type. The shipped reviewer requests read-only sandboxing, but the host may

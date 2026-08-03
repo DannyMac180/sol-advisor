@@ -227,7 +227,7 @@ runtime_id=11111111-1111-7111-8111-111111111111
 runtime_rollout=$runtime_day/rollout-2026-08-02T00-00-00-$runtime_id.jsonl
 printf '%s\n' \
   '{"type":"response_item","payload":{"prompt":"DO_NOT_LEAK_PROMPT"}}' \
-  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$runtime_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"agent_role\":\"sol_advisor_terra_implementer\",\"agent_path\":\"/root/fixture\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
+  "{\"type\":\"session_meta\",\"timestamp\":\"2026-08-02T00:00:00Z\",\"payload\":{\"id\":\"$runtime_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"agent_role\":\"sol_advisor_terra_implementer\",\"agent_path\":\"/root/fixture\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
   '{"type":"turn_context","payload":{"model":"gpt-5.6-terra","effort":"high","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
   > "$runtime_rollout"
 runtime_output=$(sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$runtime_id")
@@ -242,6 +242,202 @@ if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" invalid >/dev/null
 zero_id=22222222-2222-7222-8222-222222222222
 if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$zero_id" >/dev/null 2>&1; then fail "runtime inspector accepted zero matches"; fi
 pass "runtime inspector Terra/High routing and safe refusal"
+
+write_runtime_rollout() {
+  target_dir=$1 target_id=$2 target_path=$3 target_timestamp=$4
+  mkdir -p "$target_dir"
+  printf '%s\n' \
+    "{\"type\":\"session_meta\",\"timestamp\":\"$target_timestamp\",\"payload\":{\"id\":\"$target_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"agent_role\":\"sol_advisor_terra_implementer\",\"agent_path\":\"$target_path\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
+    '{"type":"turn_context","payload":{"model":"gpt-5.6-terra","effort":"high","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
+    > "$target_dir/rollout-fixture-$target_id.jsonl"
+}
+
+expect_exit() {
+  expected_status=$1
+  shift
+  if "$@" >/dev/null 2>&1; then actual_status=0; else actual_status=$?; fi
+  [ "$actual_status" -eq "$expected_status" ] || fail "expected exit $expected_status, got $actual_status: $*"
+}
+
+path_sessions=$tmp_dir/path-sessions
+path_id=33333333-3333-7333-8333-333333333333
+write_runtime_rollout "$path_sessions/2026/08/03" "$path_id" /root/fixture 2026-08-02T00:00:00Z
+path_output=$(sh "$runtime_inspector" --since 2026-08-02T00:00:00Z --agent-path /root/fixture --sessions-dir "$path_sessions")
+uuid_output=$(sh "$runtime_inspector" --sessions-dir "$path_sessions" "$path_id")
+[ "$path_output" = "$uuid_output" ] || fail "path-mode output differs from UUID compatibility output"
+pass "runtime inspector UUID compatibility, unique path, and cutoff equality"
+
+reused_sessions=$tmp_dir/reused-path-sessions
+old_id=44444444-4444-7444-8444-444444444444
+new_id=55555555-5555-7555-8555-555555555555
+write_runtime_rollout "$reused_sessions/old" "$old_id" /root/reused 2026-08-03T11:59:59Z
+write_runtime_rollout "$reused_sessions/new" "$new_id" /root/reused 2026-08-03T12:00:00Z
+reused_output=$(sh "$runtime_inspector" --sessions-dir "$reused_sessions" --agent-path /root/reused --since 2026-08-03T12:00:00Z)
+printf '%s\n' "$reused_output" | jq -e --arg id "$new_id" '.thread_id == $id' >/dev/null || fail "cutoff did not filter reused agent path"
+pass "runtime inspector reused path filtering"
+
+offset_sessions=$tmp_dir/offset-sessions
+utc_id=66666666-6666-7666-8666-666666666666
+fraction_id=77777777-7777-7777-8777-777777777777
+positive_id=88888888-8888-7888-8888-888888888888
+negative_id=99999999-9999-7999-8999-999999999999
+write_runtime_rollout "$offset_sessions/utc" "$utc_id" /root/utc 2026-08-03T12:00:00Z
+write_runtime_rollout "$offset_sessions/fraction" "$fraction_id" /root/fraction 2026-08-03T12:00:00.000000000Z
+write_runtime_rollout "$offset_sessions/positive" "$positive_id" /root/positive 2026-08-03T13:00:00+01:00
+write_runtime_rollout "$offset_sessions/negative" "$negative_id" /root/negative 2026-08-03T07:00:00-05:00
+for path_id in "/root/utc:$utc_id" "/root/fraction:$fraction_id" "/root/positive:$positive_id" "/root/negative:$negative_id"; do
+  runtime_path=${path_id%%:*} expected_id=${path_id#*:}
+  output=$(sh "$runtime_inspector" --sessions-dir "$offset_sessions" --agent-path "$runtime_path" --since 2026-08-03T12:00:00Z)
+  printf '%s\n' "$output" | jq -e --arg id "$expected_id" '.thread_id == $id' >/dev/null || fail "equivalent RFC3339 instant did not match: $runtime_path"
+done
+pass "runtime inspector UTC fractional and signed-offset equivalence"
+
+leap_utc_id=abababab-abab-7bab-8bab-abababababab
+leap_offset_id=acacacac-acac-7cac-8cac-acacacacacac
+leap_invalid_id=adadadad-adad-7dad-8dad-adadadadadad
+write_runtime_rollout "$offset_sessions/leap-utc" "$leap_utc_id" /root/leap_utc 2026-08-03T23:59:60Z
+write_runtime_rollout "$offset_sessions/leap-offset" "$leap_offset_id" /root/leap_offset 2026-08-04T00:29:60+00:30
+write_runtime_rollout "$offset_sessions/leap-invalid" "$leap_invalid_id" /root/leap_invalid 2026-08-03T12:59:60Z
+leap_utc_output=$(sh "$runtime_inspector" --sessions-dir "$offset_sessions" --agent-path /root/leap_utc --since 2026-08-03T23:59:59.999Z)
+printf '%s\n' "$leap_utc_output" | jq -e --arg id "$leap_utc_id" '.thread_id == $id' >/dev/null || fail "UTC leap did not order after :59"
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$offset_sessions" --agent-path /root/leap_utc --since 2026-08-04T00:00:00Z
+leap_offset_output=$(sh "$runtime_inspector" --sessions-dir "$offset_sessions" --agent-path /root/leap_offset --since 2026-08-03T23:59:60Z)
+printf '%s\n' "$leap_offset_output" | jq -e --arg id "$leap_offset_id" '.thread_id == $id' >/dev/null || fail "offset-equivalent leap did not match"
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$offset_sessions" --agent-path /root/leap_invalid --since 2026-08-03T12:00:00Z
+pass "runtime inspector UTC and offset-equivalent leap ordering"
+
+fraction_order_sessions=$tmp_dir/fraction-order-sessions
+fraction_before_id=16161616-1616-7616-8616-161616161616
+fraction_after_id=17171717-1717-7717-8717-171717171717
+fraction_equal_id=18181818-1818-7818-8818-181818181818
+leap_day_id=19191919-1919-7919-8919-191919191919
+write_runtime_rollout "$fraction_order_sessions/before" "$fraction_before_id" /root/fraction_order 2026-08-03T12:00:00.0999Z
+write_runtime_rollout "$fraction_order_sessions/after" "$fraction_after_id" /root/fraction_order 2026-08-03t12:00:00.1001z
+write_runtime_rollout "$fraction_order_sessions/equal" "$fraction_equal_id" /root/fraction_equal 2026-08-03T12:00:00.1000Z
+write_runtime_rollout "$fraction_order_sessions/leap-day" "$leap_day_id" /root/leap_day 2024-02-29T23:59:59Z
+fraction_order_output=$(sh "$runtime_inspector" --sessions-dir "$fraction_order_sessions" --agent-path /root/fraction_order --since 2026-08-03T12:00:00.1Z)
+printf '%s\n' "$fraction_order_output" | jq -e --arg id "$fraction_after_id" '.thread_id == $id' >/dev/null || fail "fractional cutoff did not exclude before-cutoff same-path record"
+fraction_equal_output=$(sh "$runtime_inspector" --sessions-dir "$fraction_order_sessions" --agent-path /root/fraction_equal --since 2026-08-03T12:00:00.1Z)
+printf '%s\n' "$fraction_equal_output" | jq -e --arg id "$fraction_equal_id" '.thread_id == $id' >/dev/null || fail "equivalent fractional values did not compare equal"
+leap_day_output=$(sh "$runtime_inspector" --sessions-dir "$fraction_order_sessions" --agent-path /root/leap_day --since 2024-02-29T23:59:59Z)
+printf '%s\n' "$leap_day_output" | jq -e --arg id "$leap_day_id" '.thread_id == $id' >/dev/null || fail "valid leap-year calendar boundary did not match"
+pass "runtime inspector fractional ordering lowercase t/z and leap-year boundary"
+
+batched_sessions=$tmp_dir/batched-sessions
+batched_unrelated=$batched_sessions/unrelated
+mkdir -p "$batched_unrelated"
+batched_index=1
+while [ "$batched_index" -le 128 ]; do
+  printf '%s\n' '{"type":"response_item","payload":{"prompt":"DO_NOT_LEAK_BATCHED_UNRELATED"}}' > "$batched_unrelated/rollout-unrelated-$batched_index.jsonl"
+  batched_index=$((batched_index + 1))
+done
+batched_id=21212121-2121-7121-8121-212121212121
+write_runtime_rollout "$batched_sessions/candidate" "$batched_id" /root/batched_candidate 2026-08-03T12:00:00Z
+batched_output=$(sh "$runtime_inspector" --sessions-dir "$batched_sessions" --agent-path /root/batched_candidate --since 2026-08-03T12:00:00Z)
+printf '%s\n' "$batched_output" | jq -e --arg id "$batched_id" '.thread_id == $id' >/dev/null || fail "batched discovery selected the wrong rollout"
+if printf '%s\n' "$batched_output" | grep -Fq DO_NOT_LEAK_BATCHED_UNRELATED; then fail "batched discovery leaked unrelated payload"; fi
+pass "runtime inspector batched discovery with many unrelated rollouts"
+
+pruned_sessions=$tmp_dir/pruned-sessions
+pruned_old=$pruned_sessions/2026/08/01
+mkdir -p "$pruned_old"
+printf '%s\n' '{malformed-old-rollout' > "$pruned_old/rollout-malformed-old.jsonl"
+pruned_current_id=22222222-2222-7222-8222-222222222222
+pruned_future_id=23232323-2323-7323-8323-232323232323
+write_runtime_rollout "$pruned_sessions/2026/08/02" "$pruned_current_id" /root/pruned_current 2026-08-03T12:00:00Z
+write_runtime_rollout "$pruned_sessions/2026/08/04" "$pruned_future_id" /root/pruned_future 2026-08-04T12:00:00Z
+for path_id in "/root/pruned_current:$pruned_current_id" "/root/pruned_future:$pruned_future_id"; do
+  runtime_path=${path_id%%:*} expected_id=${path_id#*:}
+  output=$(sh "$runtime_inspector" --sessions-dir "$pruned_sessions" --agent-path "$runtime_path" --since 2026-08-03T12:00:00Z)
+  printf '%s\n' "$output" | jq -e --arg id "$expected_id" '.thread_id == $id' >/dev/null || fail "canonical date pruning selected the wrong rollout"
+done
+pass "runtime inspector prunes old canonical directories"
+
+binding_sessions=$tmp_dir/binding-sessions
+binding_metadata_id=24242424-2424-7424-8424-242424242424
+binding_filename_id=25252525-2525-7525-8525-252525252525
+mkdir -p "$binding_sessions"
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"timestamp\":\"2026-08-03T12:00:00Z\",\"payload\":{\"id\":\"$binding_metadata_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"agent_role\":\"sol_advisor_terra_implementer\",\"agent_path\":\"/root/binding\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-terra","effort":"high","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
+  > "$binding_sessions/rollout-fixture-$binding_filename_id.jsonl"
+write_runtime_rollout "$binding_sessions" "$binding_metadata_id" /root/not_binding 2026-08-03T12:00:00Z
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$binding_sessions" --agent-path /root/binding --since 2026-08-03T12:00:00Z
+pass "runtime inspector binds path metadata to its rollout filename"
+
+invalid_timestamp_sessions=$tmp_dir/invalid-timestamp-sessions
+mkdir -p "$invalid_timestamp_sessions"
+for invalid_timestamp in 2026-02-30T12:00:00Z 2026-08-03T24:00:00Z 2026-08-03T12:60:00Z 2026-08-03T12:00:61Z 2026-08-03T12:00:00+24:00 2026-08-03T12:00:00+01:60 2026-08-03T12:00:00-00:00; do
+  expect_exit 1 sh "$runtime_inspector" --sessions-dir "$invalid_timestamp_sessions" --agent-path /root/invalid --since "$invalid_timestamp"
+done
+pass "runtime inspector rejects invalid calendar, offset, and unknown-offset timestamps"
+
+invalid_candidate_sessions=$tmp_dir/invalid-candidate-sessions
+invalid_candidate_id=20202020-2020-7020-8020-202020202020
+write_runtime_rollout "$invalid_candidate_sessions" "$invalid_candidate_id" /root/invalid_candidate 2026-02-29T12:00:00Z
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$invalid_candidate_sessions" --agent-path /root/invalid_candidate --since 2026-02-01T00:00:00Z
+pass "runtime inspector rejects invalid candidate timestamps"
+
+expect_exit 2 sh "$runtime_inspector" --sessions-dir "$path_sessions" --sessions-dir "$path_sessions" "$path_id"
+expect_exit 2 sh "$runtime_inspector" --agent-path /root/fixture --agent-path /root/fixture --since 2026-08-03T12:00:00Z
+expect_exit 2 sh "$runtime_inspector" --agent-path /root/fixture --since 2026-08-03T12:00:00Z --since 2026-08-03T12:00:00Z
+expect_exit 2 sh "$runtime_inspector" --unknown "$path_id"
+expect_exit 2 sh "$runtime_inspector" --sessions-dir "$path_sessions" "$path_id" "$path_id"
+expect_exit 2 sh "$runtime_inspector" --sessions-dir "$path_sessions" "$path_id" --agent-path /root/fixture --since 2026-08-03T12:00:00Z
+expect_exit 2 sh "$runtime_inspector" --sessions-dir "$path_sessions" --since 2026-08-03T12:00:00Z
+expect_exit 2 sh "$runtime_inspector" --sessions-dir "$path_sessions" --agent-path /root/fixture
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$path_sessions" --agent-path /root/Invalid --since 2026-08-03T12:00:00Z
+pass "runtime inspector strict CLI and canonical-path validation"
+
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$path_sessions" --agent-path /root/no_match --since 2026-08-03T12:00:00Z
+ambiguous_sessions=$tmp_dir/ambiguous-sessions
+write_runtime_rollout "$ambiguous_sessions/one" aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa /root/ambiguous 2026-08-03T12:00:00Z
+write_runtime_rollout "$ambiguous_sessions/two" bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb /root/ambiguous 2026-08-03T12:00:01Z
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$ambiguous_sessions" --agent-path /root/ambiguous --since 2026-08-03T12:00:00Z
+concurrent_sessions=$tmp_dir/concurrent-sessions
+write_runtime_rollout "$concurrent_sessions/one" cccccccc-cccc-7ccc-8ccc-cccccccccccc /root/concurrent/one 2026-08-03T12:00:00Z
+write_runtime_rollout "$concurrent_sessions/two" dddddddd-dddd-7ddd-8ddd-dddddddddddd /root/concurrent/two 2026-08-03T12:00:00Z
+for path_id in /root/concurrent/one:cccccccc-cccc-7ccc-8ccc-cccccccccccc /root/concurrent/two:dddddddd-dddd-7ddd-8ddd-dddddddddddd; do
+  runtime_path=${path_id%%:*} expected_id=${path_id#*:}
+  output=$(sh "$runtime_inspector" --sessions-dir "$concurrent_sessions" --agent-path "$runtime_path" --since 2026-08-03T12:00:00Z)
+  printf '%s\n' "$output" | jq -e --arg id "$expected_id" '.thread_id == $id' >/dev/null || fail "concurrent path lookup selected wrong agent"
+done
+pass "runtime inspector no-match, ambiguity, and concurrent-path isolation"
+
+sentinel=DO_NOT_LEAK_PATH_OR_PROMPT
+prompt_sessions=$tmp_dir/prompt-sessions
+prompt_id=eeeeeeee-eeee-7eee-8eee-eeeeeeeeeeee
+write_runtime_rollout "$prompt_sessions/fixture" "$prompt_id" /root/real 2026-08-03T12:00:00Z
+printf '%s\n' "{\"type\":\"response_item\",\"payload\":{\"prompt\":\"$sentinel /root/prompt_only\"}}" >> "$prompt_sessions/fixture/rollout-fixture-$prompt_id.jsonl"
+prompt_error=$(sh "$runtime_inspector" --sessions-dir "$prompt_sessions" --agent-path /root/prompt_only --since 2026-08-03T12:00:00Z 2>&1 >/dev/null || true)
+if printf '%s\n' "$prompt_error" | grep -Fq "$sentinel"; then fail "runtime inspector leaked prompt sentinel in error"; fi
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$prompt_sessions" --agent-path /root/prompt_only --since 2026-08-03T12:00:00Z
+
+malformed_sessions=$tmp_dir/malformed-sessions
+mkdir -p "$malformed_sessions"
+printf '%s\n' '{invalid-json' > "$malformed_sessions/rollout-fixture-ffffffff-ffff-7fff-8fff-ffffffffffff.jsonl"
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$malformed_sessions" --agent-path /root/malformed --since 2026-08-03T12:00:00Z
+missing_timestamp_sessions=$tmp_dir/missing-timestamp-sessions
+mkdir -p "$missing_timestamp_sessions"
+printf '%s\n' '{"type":"session_meta","payload":{"id":"12121212-1212-7212-8212-121212121212","agent_path":"/root/missing_timestamp"}}' > "$missing_timestamp_sessions/rollout-fixture-12121212-1212-7212-8212-121212121212.jsonl"
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$missing_timestamp_sessions" --agent-path /root/missing_timestamp --since 2026-08-03T12:00:00Z
+malformed_metadata_sessions=$tmp_dir/malformed-metadata-sessions
+mkdir -p "$malformed_metadata_sessions"
+printf '%s\n' '{"type":"session_meta","timestamp":"2026-08-03T12:00:00Z","payload":null}' > "$malformed_metadata_sessions/rollout-fixture-13131313-1313-7313-8313-131313131313.jsonl"
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$malformed_metadata_sessions" --agent-path /root/malformed_metadata --since 2026-08-03T12:00:00Z
+pass "runtime inspector ignores prompt-only false matches and safely refuses malformed metadata"
+
+strict_sessions=$tmp_dir/strict-sessions
+strict_id=14141414-1414-7414-8414-141414141414
+write_runtime_rollout "$strict_sessions/missing" "$strict_id" /root/strict_missing 2026-08-03T12:00:00Z
+strict_rollout=$strict_sessions/missing/rollout-fixture-$strict_id.jsonl
+sed '2,$d' "$strict_rollout" > "$strict_rollout.first" && mv "$strict_rollout.first" "$strict_rollout"
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$strict_sessions" --agent-path /root/strict_missing --since 2026-08-03T12:00:00Z
+conflicting_id=15151515-1515-7515-8515-151515151515
+write_runtime_rollout "$strict_sessions/conflicting" "$conflicting_id" /root/strict_conflicting 2026-08-03T12:00:00Z
+printf '%s\n' '{"type":"turn_context","payload":{"model":"different-model","effort":"high","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' >> "$strict_sessions/conflicting/rollout-fixture-$conflicting_id.jsonl"
+expect_exit 1 sh "$runtime_inspector" --sessions-dir "$strict_sessions" --agent-path /root/strict_conflicting --since 2026-08-03T12:00:00Z
+pass "runtime inspector preserves strict missing and conflicting routing refusal"
 
 for document in "$skill" "$contracts"; do
   grep -Fq 'agent_type: sol_advisor_terra_implementer' "$document" || fail "missing Terra spawn in $document"
