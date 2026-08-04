@@ -16,6 +16,7 @@ manifest=$plugin_dir/.codex-plugin/plugin.json
 skill=$plugin_dir/skills/orchestration/SKILL.md
 contracts=$plugin_dir/skills/orchestration/references/role-contracts.md
 luna_contract=$plugin_dir/skills/orchestration/references/luna-task-lane.md
+luna_bridge=$plugin_dir/skills/orchestration/references/luna-bridge.md
 readme=$repo_dir/README.md
 ui=$plugin_dir/skills/orchestration/agents/openai.yaml
 
@@ -101,7 +102,7 @@ LEGACY_LUNA
   [ "$(shasum -a 256 "$target/$luna_file" | awk '{print $1}')" = "$legacy_luna_sha256" ] || fail "legacy Luna fixture digest drifted"
 }
 
-for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contracts" "$luna_contract" "$readme" "$ui"; do
+for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contracts" "$luna_contract" "$luna_bridge" "$readme" "$ui"; do
   test -f "$required" || fail "required file missing: $required"
 done
 
@@ -263,6 +264,29 @@ grep -Fqi 'parent captures and verifies exact before-and-after' "$contracts" || 
 grep -Fq 'luna-task-lane.md' "$skill" || fail "skill does not link the Luna task contract"
 grep -Fq 'luna-task-lane.md' "$contracts" || fail "role contracts do not link the Luna task contract"
 
+for document in "$skill" "$contracts" "$luna_contract" "$readme" "$ui" "$manifest"; do
+  grep -Fq 'luna-bridge.md' "$document" || fail "$document does not link or cite the Luna bridge"
+done
+grep -Fq 'BRIDGE CORRELATION ID' "$luna_bridge" || fail "Luna bridge omits correlation ID marker"
+grep -Fq 'BRIDGE STATE' "$luna_bridge" || fail "Luna bridge omits state marker"
+grep -Fq 'normal lifecycle is `pending -> ready -> running -> completed`' "$luna_bridge" || fail "Luna bridge omits normal state lifecycle"
+grep -Fq 'moves it to `blocked`' "$luna_bridge" || fail "Luna bridge omits blocked-state transition"
+grep -Fq 'BRIDGE ENVELOPE' "$luna_bridge" || fail "Luna bridge omits structured envelope"
+grep -Fq 'BRIDGE ACK' "$luna_bridge" || fail "Luna bridge omits structured acknowledgement"
+grep -Fq 'REQUEST KIND: identity binding' "$luna_bridge" || fail "Luna bridge omits ready-identity binding"
+grep -Fq 'acknowledgement matches the recorded correlation' "$luna_bridge" || fail "Luna bridge omits post-create ACK binding"
+grep -Fq 'PROJECT ID: <observed projectId>' "$luna_bridge" || fail "Luna bridge ACK omits project identity"
+grep -Fq 'SAME-TASK CORRECTION' "$luna_bridge" || fail "Luna bridge omits same-task correction marker"
+grep -Fq 'same recorded `threadId` and `hostId`' "$luna_bridge" || fail "Luna bridge does not bind corrections to one task identity"
+grep -Fq 'never pass `clientThreadId` to `list_threads`, `wait_threads`' "$luna_bridge" || fail "Luna bridge permits clientThreadId pass-through"
+grep -Fq 'PR AUTHORIZED FOR <threadId>' "$luna_bridge" || fail "Luna bridge omits PR authorization marker"
+grep -Fq 'Only after primary acceptance' "$luna_bridge" || fail "Luna bridge permits PR authorization before acceptance"
+grep -Fq 'stale' "$luna_bridge" || fail "Luna bridge omits stale-evidence handling"
+grep -Fq 'mismatch' "$luna_bridge" || fail "Luna bridge omits identity-mismatch handling"
+grep -Fq 'when one exists' "$luna_bridge" || fail "Luna bridge attempts read_thread without a real identity"
+grep -Fq 'pre-identity block preserves' "$luna_bridge" || fail "Luna bridge omits pre-identity block handling"
+pass "Luna primary-to-task bridge and aligned surfaces"
+
 for tool in list_projects list_threads create_thread wait_threads read_thread send_message_to_thread; do
   for document in "$skill" "$contracts" "$luna_contract" "$readme"; do
     grep -Fq "$tool" "$document" || fail "$document omits Luna app tool: $tool"
@@ -323,7 +347,7 @@ for document in "$readme" "$manifest" "$skill" "$contracts" "$ui"; do
 done
 forbidden_terra='sol_advisor_terra_'"max"
 forbidden_file='sol-advisor-terra-'"max"
-if rg -n "$forbidden_terra|$forbidden_file" "$readme" "$plugin_dir"; then fail "forbidden second Terra role remains"; fi
+if grep -R -n -E "$forbidden_terra|$forbidden_file" "$readme" "$plugin_dir"; then fail "forbidden second Terra role remains"; fi
 pass "native and Luna contracts, opt-in guards, and stale-claim checks"
 
 sh -n "$installer"

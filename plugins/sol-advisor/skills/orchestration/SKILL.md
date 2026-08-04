@@ -16,6 +16,8 @@ V2, never uses a Luna custom-agent TOML, and is never activated implicitly.
 Read [references/role-contracts.md](references/role-contracts.md) before the first
 native delegation in a session. Read the [Luna task-lane contract](references/luna-task-lane.md)
 before any explicitly authorized Luna task creation.
+For every Luna task, also follow the mandatory
+[primary-to-task bridge](references/luna-bridge.md).
 
 ## Confirm the primary session
 
@@ -172,6 +174,10 @@ available; never pass the pending client ID to `wait_threads`, `read_thread`, or
 to obtain the final handoff and any available outputs, and inspect the actual
 branch/worktree, diff, and checks in the primary task. “Report back” means the primary
 performs this wait/read; do not claim an automatic child callback.
+After the real identity is ready, send an updated bridge envelope with
+`REQUEST KIND: identity binding` to that same `threadId` and `hostId`, then wait/read
+the same task and require a matching `BRIDGE ACK` containing project and task identity
+before treating it as running.
 
 Corrections use `send_message_to_thread` with the same real task identity. Wait and
 read that same task again, then repeat primary diff inspection. The primary owns
@@ -183,7 +189,10 @@ recorded. Run independent, non-overlapping stacks concurrently; serialize shared
 and dependent stacks.
 
 Use the complete packet and branch rules in
-[references/luna-task-lane.md](references/luna-task-lane.md).
+[references/luna-task-lane.md](references/luna-task-lane.md) and record the bridge
+correlation ID, state, acknowledgement, same-task corrections, and post-acceptance
+`PR AUTHORIZED FOR <threadId>` marker under
+[references/luna-bridge.md](references/luna-bridge.md).
 
 ## Verify every implementation
 

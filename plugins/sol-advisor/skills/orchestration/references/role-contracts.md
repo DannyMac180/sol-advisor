@@ -4,6 +4,8 @@ Use these contracts with Sol Advisor's namespaced, role-pinned native custom age
 They do not launch a nested Codex CLI or change global default-subagent routing. The
 separate [Luna task-lane contract](luna-task-lane.md) covers user-visible app tasks;
 it is not a native custom-agent role and must not be represented by a companion TOML.
+Every Luna task also follows the canonical
+[primary-to-task bridge](luna-bridge.md).
 Adapt every placeholder without removing a required field.
 
 ## Required preflight
@@ -92,6 +94,10 @@ boundary, and structured return. The primary monitors with `wait_threads`, reads
 handoff with `read_thread`, and independently inspects the actual branch/worktree,
 diff, and checks. Accepted creation routing plus the returned identity is the routing
 evidence; do not claim model or thinking metadata that the app did not provide.
+After a real `threadId` and `hostId` are ready, send the bridge envelope with
+`REQUEST KIND: identity binding` to that same task, then wait/read it and require a
+matching `BRIDGE ACK` containing the project and task identity before treating the
+child as running.
 
 Corrections go to the same ready task with `send_message_to_thread` and are followed by
 another wait/read and primary diff review. The primary owns decomposition, ordering,
@@ -101,6 +107,9 @@ task only after accepting the prior stack. Independent, non-overlapping stacks m
 concurrent; shared-file and dependent stacks are serial. Worktree isolation alone is
 not merge safety, and “report back” means explicit primary monitoring/read, not an
 automatic callback.
+Record the bridge correlation ID and state, use its structured envelope/acknowledgement,
+keep corrections on the same `threadId` plus `hostId`, and send `PR AUTHORIZED FOR
+<threadId>` only after primary acceptance. See [luna-bridge.md](luna-bridge.md).
 
 ## Terra / High - sole native implementation lane
 

@@ -11,11 +11,11 @@
   "interface": {
     "displayName": "Sol Advisor",
     "shortDescription": "Orchestrate with Sol, use native Terra / High or opt-in Luna tasks, and verify the accepted diff.",
-    "longDescription": "Sol Advisor gives Codex two explicit delivery modes: GPT-5.6 Sol keeps architecture, decomposition, verification, and acceptance in the primary session; the native mode uses a separately installed GPT-5.6 Terra / High role and a fresh Sol reviewer, while the opt-in Luna mode creates user-visible GPT-5.6 Luna / Max tasks through list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread and keeps review, corrections, PR authorization, and dependent-stack ordering in the primary session.",
+    "longDescription": "Sol Advisor gives Codex two explicit delivery modes: GPT-5.6 Sol keeps architecture, decomposition, verification, and acceptance in the primary session; the native mode uses a separately installed GPT-5.6 Terra / High role and a fresh Sol reviewer, while the opt-in Luna mode creates user-visible GPT-5.6 Luna / Max tasks through list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread and keeps review, corrections, PR authorization, and dependent-stack ordering in the primary session. Luna work follows luna-bridge.md with BRIDGE CORRELATION ID, BRIDGE STATE, ready-identity binding with a matching BRIDGE ACK, same-task correction, and post-acceptance PR authorization.",
     "developerName": "Daniel McAteer",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
     "websiteURL": "https://github.com/DannyMac180/sol-advisor",
-    "defaultPrompt": ["Use Sol Advisor's native lane to build this feature, verify it, and obtain the fresh Sol review before completion.", "Use the Luna task lane only when I explicitly authorize it; create user-visible GPT-5.6 Luna / Max tasks through Codex app task tools and keep primary review and acceptance in this task."]
+    "defaultPrompt": ["Use Sol Advisor's native lane to build this feature, verify it, and obtain the fresh Sol review before completion.", "Use the Luna task lane only when I explicitly authorize it; create user-visible GPT-5.6 Luna / Max tasks through Codex app task tools, follow luna-bridge.md with BRIDGE CORRELATION ID and BRIDGE STATE, bind the ready identity and require a matching BRIDGE ACK, keep corrections on the same threadId/hostId, and authorize a PR only after acceptance."]
   }
 }

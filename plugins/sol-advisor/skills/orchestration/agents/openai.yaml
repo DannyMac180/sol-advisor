@@ -1,4 +1,4 @@
 interface:
   display_name: "Sol Advisor Orchestration"
   short_description: "Use native Terra / High or explicitly opt into Luna tasks, then verify and accept"
-  default_prompt: "Use $orchestration for the native Terra / High lane and fresh Sol review; use the user-visible Luna task lane only when I explicitly authorize it, then use list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread to monitor, review, correct, and accept the task yourself."
+  default_prompt: "Use $orchestration for the native Terra / High lane and fresh Sol review; use the user-visible Luna task lane only when I explicitly authorize it, then use list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread and follow luna-bridge.md: record BRIDGE CORRELATION ID and BRIDGE STATE, bind the ready identity and require a matching BRIDGE ACK, use the same threadId/hostId for corrections, and send PR AUTHORIZED FOR <threadId> only after acceptance."

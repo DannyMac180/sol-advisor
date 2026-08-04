@@ -5,6 +5,10 @@ lane. It is a Codex app-task workflow outside native subagent V2. The primary
 GPT-5.6 Sol / High task remains the architect, reviewer, correction owner, PR
 authority, and final acceptor.
 
+The [primary-to-task bridge](luna-bridge.md) is mandatory for every Luna task:
+record its correlation ID, state, identity history, envelopes, acknowledgements, and
+same-task correction/PR-authorization evidence.
+
 ## Scope and authorization
 
 - Create a Luna task only when the user's current request explicitly authorizes it,
@@ -36,6 +40,7 @@ authority, and final acceptor.
    tree or an existing branch as the starting state unless the primary explicitly
    chooses that state. When using an existing branch for a dependent stack, the branch
    must already exist; `startingState` is not a way to name a new branch.
+   Create and record the bridge envelope before this call.
 4. Accept task-lane routing only from accepted `create_thread` routing plus the
    returned task identity. If the app supplies model, thinking, host, worktree, or
    branch metadata, report those observed values; never infer unavailable runtime
@@ -49,6 +54,10 @@ authority, and final acceptor.
    Repeat bounded discovery until a real `threadId` and `hostId` are available; never
    pass the pending client ID to `wait_threads`, `read_thread`, or
    `send_message_to_thread`.
+   Once the real identity is available, send an updated bridge envelope with
+   `REQUEST KIND: identity binding` through `send_message_to_thread` to that same
+   `threadId` and `hostId`. Wait/read the same task and require a matching `BRIDGE ACK`
+   containing the project and task identity before treating the child as `running`.
 6. Use `wait_threads` for bounded monitoring of ready tasks. When a task completes or
    needs attention, use `read_thread` to read its final handoff and available outputs.
    “Report back” means the primary performs this monitor/read cycle; there is no
@@ -65,6 +74,11 @@ authority, and final acceptor.
    `PR AUTHORIZED FOR <threadId>`. No child may create or push a PR before that
    authorization. Record the resulting branch, commit, and PR evidence before
    creating the next dependent task.
+
+Follow the [primary-to-task bridge](luna-bridge.md) for every state transition,
+wait/read record, stale or mismatch response, structured acknowledgement, and PR
+marker. `clientThreadId` remains historical evidence only and is never passed through
+to a thread tool.
 
 ## Complete task packet
 
