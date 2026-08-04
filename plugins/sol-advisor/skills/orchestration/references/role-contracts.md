@@ -24,6 +24,12 @@ A missing, stale, unsafe, conflicting, unavailable, inconsistent, or unobservabl
 role/model/effort stops the native lane. Never silently fall back. Model and effort are
 pinned by custom-agent TOML, so omit native per-spawn overrides.
 
+When local runtime evidence is needed, complete steps 1-2, then record a UTC RFC3339
+cutoff immediately before native spawn. After that spawn returns, retain its canonical
+`/root/<task>` path and call the inspector with `--agent-path "$agent_path" --since
+"$runtime_since"`. The positional lowercase UUID inspector interface remains available
+for compatibility.
+
 ## Shared implementation contract
 
 Every Terra prompt must contain all five sections:

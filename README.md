@@ -145,18 +145,32 @@ thread_id="<native-subagent-thread-id>"
 sh "$plugin_dir/scripts/inspect-agent-runtime.sh" "$thread_id"
 ~~~
 
+For native `spawn_agent` routing, capture a UTC cutoff immediately before the spawn,
+then retain the canonical `/root/<task>` path that native spawn returns. This avoids
+mistaking an earlier rollout that reused the same task path for the new agent:
+
+~~~sh
+runtime_since="$(date -u +%Y-%m-%dT%H:%M:%SZ)" # immediately before native spawn_agent
+agent_path="/root/<canonical-task-path-returned-by-spawn>"
+sh "$plugin_dir/scripts/inspect-agent-runtime.sh" --agent-path "$agent_path" --since "$runtime_since"
+~~~
+
+The positional lowercase UUID interface remains supported for compatibility.
+
 For a disposable fixture or a non-default local session root, pass it explicitly:
 
 ~~~sh
 sh "$plugin_dir/scripts/inspect-agent-runtime.sh" --sessions-dir /absolute/path/to/sessions "$thread_id"
 ~~~
 
-The helper searches only rollout filenames ending in that exact thread id, then emits a
-single compact JSON object with allowlisted routing fields. It never prints prompts,
-messages, environment variables, tokens, configuration contents, or arbitrary rollout
-payloads. It refuses invalid ids, zero or multiple matches, and missing or inconsistent
-role/model/effort; there is no inferred fallback. If public and local evidence both
-exist, they must agree.
+The UUID mode searches only rollout filenames ending in that exact thread id. Path mode
+uses only exact session-metadata `agent_path` records at or after its inclusive cutoff,
+resolves their UUID, and then applies the same strict filename and routing validation.
+Both modes emit one compact JSON object with allowlisted routing fields. The helper
+never prints prompts, messages, environment variables, tokens, configuration contents,
+or arbitrary rollout payloads. It refuses invalid ids, no or ambiguous matches, and
+missing or inconsistent role/model/effort; there is no inferred fallback. If public and
+local evidence both exist, they must agree.
 
 ## How routing works
 
