@@ -220,3 +220,24 @@ The primary may accept a Luna task only after it has:
   itself; and
 - recorded the accepted node's exact branch, base, commit SHA, complete diff, tests,
   and PR state before starting the next dependent layer.
+
+## Graph closure and task archival
+
+After all authorized graph nodes pass the primary acceptance checklist and their
+integration or PR state is recorded:
+
+1. Inspect the actual app task list and identify completed node tasks, completed
+   correction tasks, and superseded attempts that have no unresolved correction,
+   blocker, or dependent work.
+2. Tell the user that the graph work is complete and list the exact task identities
+   that are safe to archive. State that task archival does not delete Git worktrees,
+   branches, commits, or artifacts.
+3. Do not archive user-visible tasks without explicit user authorization. Keep the
+   primary leader task available by default because it owns graph decisions,
+   integration evidence, and the final handoff.
+4. If the user authorizes archival and `set_thread_archived` is available, archive
+   only the exact approved task identities and verify the resulting app state. Leave
+   ambiguous or failed targets unarchived and report them precisely.
+
+Archival is a post-acceptance housekeeping action. It must not be used to hide an
+unfinished task, bypass a correction loop, or manufacture graph completion.

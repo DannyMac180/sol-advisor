@@ -124,7 +124,7 @@ sh "$plugin_dir/scripts/install-agents.sh"
 sh "$plugin_dir/scripts/install-agents.sh" --check
 ~~~
 
-Version 0.5.0 retains the historical byte-exact v0.2.0 migration for
+Version 0.5.1 retains the historical byte-exact v0.2.0 migration for
 `sol-advisor-luna-implementer.toml` and `sol-advisor-terra-implementer.toml` files.
 Normal installer mode replaces the exact legacy Terra file with the current Terra /
 High template, removes the exact legacy Luna file, and refuses modified, nonregular,
@@ -226,6 +226,14 @@ worktree reduces interference but does not make concurrent edits merge-safe; the
 primary still reviews every diff and orders dependent work from an accepted base.
 The complete packet, tool sequence, branch rules, and return schema are defined in
 [the Luna task-lane reference](plugins/sol-advisor/skills/orchestration/references/luna-task-lane.md).
+
+After every authorized graph node is accepted and integrated, Sol inspects the actual
+task list and tells the user which completed node tasks are safe to archive. It
+does not archive user-visible tasks until the user explicitly authorizes that action,
+keeps the primary leader task available by default, and reports exact task identities
+when possible. Task archival only organizes the Codex task list; it does not delete
+Git worktrees, branches, commits, or artifacts, and worktree cleanup remains a
+separate operation.
 
 ### Native subagent lane (current shipped workflow)
 

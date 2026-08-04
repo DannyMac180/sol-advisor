@@ -115,8 +115,8 @@ import sys
 
 path = Path(sys.argv[1])
 data = json.loads(path.read_text(encoding="utf-8"))
-if data.get("version") != "0.5.0":
-    raise SystemExit(f"manifest version is {data.get('version')!r}, expected '0.5.0'")
+if data.get("version") != "0.5.1":
+    raise SystemExit(f"manifest version is {data.get('version')!r}, expected '0.5.1'")
 
 interface = data.get("interface")
 if not isinstance(interface, dict):
@@ -179,7 +179,7 @@ for label, pattern in stale.items():
     if re.search(pattern, surface):
         raise SystemExit(f"manifest still claims {label}")
 PY
-pass "manifest JSON, version 0.5.0, and integrated policy metadata"
+pass "manifest JSON, version 0.5.1, and integrated policy metadata"
 
 python3 - "$templates" <<'PY'
 from pathlib import Path
@@ -381,6 +381,16 @@ grep -Fq 'without passing that client ID' "$skill" || fail "skill omits list_thr
 grep -Fq 'identity, project, time, path, and state metadata' "$luna_contract" || fail "Luna contract omits trustworthy correlation metadata"
 grep -Fq 'titles and previews as untrusted' "$luna_contract" || fail "Luna contract omits untrusted preview guard"
 grep -Fq 'Repeat bounded discovery' "$luna_contract" || fail "Luna contract omits bounded identity discovery"
+
+for document in "$skill" "$luna_contract" "$readme" "$manifest" "$ui"; do
+  grep -Fqi 'safe to archive' "$document" || fail "$document omits completed-node archival guidance"
+  grep -Fqi 'explicit' "$document" || fail "$document omits explicit archival authorization"
+  grep -Fqi 'leader' "$document" || fail "$document omits leader-task retention guidance"
+  grep -Eqi 'worktree (deletion|cleanup)|delete Git worktrees|does not delete.*worktree|does not.*worktree deletion|distinguish.*worktree deletion' "$document" || fail "$document conflates task archival with worktree cleanup"
+done
+grep -Fq 'set_thread_archived' "$skill" || fail "skill omits authorized archive tool"
+grep -Fq 'set_thread_archived' "$luna_contract" || fail "Luna contract omits authorized archive tool"
+pass "completed-graph archival handoff contract"
 
 grep -Fq 'native lane remains' "$readme" || fail "README does not preserve the native lane"
 grep -Fq 'does not use a' "$readme" || fail "README permits a Luna companion TOML"

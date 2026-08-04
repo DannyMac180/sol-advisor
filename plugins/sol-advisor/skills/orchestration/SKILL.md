@@ -218,6 +218,28 @@ Treat worker reports as claims. Before acceptance:
 5. For the native lane, delegate corrections through Terra; for the Luna lane, send
    corrections back to the same task and re-review its updated evidence.
 
+## Close completed task graphs
+
+After every authorized graph node is accepted and its integration or PR state is
+recorded, inspect the actual task list and tell the user which completed node tasks
+are safe to archive. Include accepted nodes, completed correction tasks, and
+superseded attempts only when they have no unresolved correction, blocker, or
+dependent work. Report the exact task identities when available.
+
+Do not archive user-visible tasks merely because the graph is complete. Ask for or
+act on explicit user authorization first. Keep the primary leader task available by
+default because it owns the graph decisions, integration evidence, and final handoff;
+recommend archiving it only when the overall task itself is being retired or has a
+durable successor. State that task archival does not delete Git worktrees, branches,
+commits, or artifacts, and never remove those resources as an implied part of
+archival.
+
+When the user authorizes archival and the app exposes `set_thread_archived`, archive
+only the exact completed task identities and verify the resulting state with the app
+task tools. If the archive tool is unavailable or any target is ambiguous, leave that
+task unarchived and report the exact gap. This closure capability is optional until
+the user requests archival; its absence does not block implementation or acceptance.
+
 ## Consult fresh Sol at native commitment boundaries
 
 Before a consequential architecture, migration, public API, or wide refactor in the
