@@ -8,9 +8,9 @@ usage() {
 Usage: install-agents.sh [--target-dir PATH] [--check]
 
 Install Sol Advisor's two current custom-agent templates into the target directory.
-Normal mode also migrates only the exact v0.2.0 companion files: it replaces the
-legacy Terra template and removes the legacy Luna template. It never overwrites a
-modified, nonregular, or symlinked destination.
+Normal mode migrates only exact recognized legacy files: it replaces the v0.2.0 Terra
+template, removes the v0.2.0 Luna template, and replaces the v0.4.0 Sol reviewer
+template. It never overwrites a modified, nonregular, or symlinked destination.
 
 Without --target-dir, the target is "$CODEX_HOME/agents" when CODEX_HOME is already
 set, otherwise "$HOME/.codex/agents".
@@ -139,6 +139,31 @@ replace_legacy_terra() {
   printf '%s\n' "MIGRATED: $terra_destination"
 }
 
+replace_legacy_sol() {
+  staged=''
+
+  [ "$(classify_current_or_legacy "$sol_destination" "$sol_template" "$legacy_sol_sha256")" = legacy ] ||
+    fail "legacy Sol destination changed after preflight and will not be replaced: $sol_destination"
+
+  staged=$(mktemp "$target_dir/.sol-advisor-agent.XXXXXX") || fail "could not stage migrated Sol template: $sol_destination"
+  if ! cp "$sol_template" "$staged"; then
+    rm -f "$staged"
+    fail "could not stage migrated Sol template: $sol_destination"
+  fi
+
+  [ "$(classify_current_or_legacy "$sol_destination" "$sol_template" "$legacy_sol_sha256")" = legacy ] || {
+    rm -f "$staged"
+    fail "legacy Sol destination changed after preflight and will not be replaced: $sol_destination"
+  }
+
+  if ! mv -f "$staged" "$sol_destination"; then
+    rm -f "$staged"
+    fail "could not replace exact legacy Sol template: $sol_destination"
+  fi
+
+  printf '%s\n' "MIGRATED: $sol_destination"
+}
+
 remove_legacy_luna() {
   [ "$(classify_legacy_luna "$luna_destination")" = legacy ] ||
     fail "legacy Luna destination changed after preflight and will not be removed: $luna_destination"
@@ -206,6 +231,7 @@ luna_destination=$target_dir/$luna_file
 # git show HEAD:plugins/sol-advisor/agents/sol-advisor-terra-implementer.toml | shasum -a 256
 legacy_luna_sha256=fba1b42849d93737e83b094a2ab0b1611f87ac37db7438c8bbdf581f0813f8eb
 legacy_terra_sha256=4425a8c1f21ce8c6af93f96adc253bbc33ea301f1389b3fa8ce350be08584eca
+legacy_sol_sha256=0333acf0ef562bcfebd06009ac09bd1dd8cbc04c4cf28e08e9e049bd8bf202d2
 
 for template in "$terra_template" "$sol_template"; do
   [ -f "$template" ] && [ ! -L "$template" ] ||
@@ -220,7 +246,7 @@ if path_exists "$target_dir"; then
 fi
 
 terra_state=$(classify_current_or_legacy "$terra_destination" "$terra_template" "$legacy_terra_sha256")
-sol_state=$(classify_current_or_legacy "$sol_destination" "$sol_template" '')
+sol_state=$(classify_current_or_legacy "$sol_destination" "$sol_template" "$legacy_sol_sha256")
 luna_state=$(classify_legacy_luna "$luna_destination")
 
 if [ "$check_only" -eq 1 ]; then
@@ -236,7 +262,7 @@ else
     *) report_preflight_error "Terra destination is $terra_state and will not be replaced: $terra_destination" ;;
   esac
   case "$sol_state" in
-    current|missing) ;;
+    current|legacy|missing) ;;
     *) report_preflight_error "Sol destination is $sol_state and will not be replaced: $sol_destination" ;;
   esac
   case "$luna_state" in
@@ -259,7 +285,7 @@ fi
   fail "target directory changed after preflight: $target_dir"
 
 same_state Terra "$terra_state" "$(classify_current_or_legacy "$terra_destination" "$terra_template" "$legacy_terra_sha256")"
-same_state Sol "$sol_state" "$(classify_current_or_legacy "$sol_destination" "$sol_template" '')"
+same_state Sol "$sol_state" "$(classify_current_or_legacy "$sol_destination" "$sol_template" "$legacy_sol_sha256")"
 same_state "legacy Luna" "$luna_state" "$(classify_legacy_luna "$luna_destination")"
 
 case "$terra_state" in
@@ -270,6 +296,7 @@ esac
 
 case "$sol_state" in
   missing) install_missing "$sol_template" "$sol_destination" ;;
+  legacy) replace_legacy_sol ;;
   current) printf '%s\n' "ALREADY CURRENT: $sol_destination" ;;
 esac
 
@@ -279,7 +306,7 @@ fi
 
 [ "$(classify_current_or_legacy "$terra_destination" "$terra_template" "$legacy_terra_sha256")" = current ] ||
   fail "post-install exactness check failed: $terra_destination"
-[ "$(classify_current_or_legacy "$sol_destination" "$sol_template" '')" = current ] ||
+[ "$(classify_current_or_legacy "$sol_destination" "$sol_template" "$legacy_sol_sha256")" = current ] ||
   fail "post-install exactness check failed: $sol_destination"
 [ "$(classify_legacy_luna "$luna_destination")" = missing ] ||
   fail "post-install legacy removal check failed: $luna_destination"

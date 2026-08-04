@@ -28,6 +28,12 @@ independent: Sol reviews Sol's orchestration with a fresh context. In the Luna l
 the primary Sol task itself reviews and accepts the Luna task's work; it does not route
 that lane through the native Sol reviewer.
 
+The native Sol reviewer has two explicit packet modes: `commitment` returns only
+`proceed`, `change`, or `stop` before a consequential decision; `final` returns only
+`ship`, `fix-first`, or `rethink` after implementation. The packet's single
+`REVIEW MODE` control line selects the vocabulary; invalid or ambiguous mode control
+stops without a verdict.
+
 ## Install from GitHub
 
 Requirements common to both modes:
@@ -39,6 +45,7 @@ Additional native-mode requirements:
 
 - Native subagents and custom-agent support enabled.
 - Access to GPT-5.6 Terra / High.
+- Python 3.11 or newer for the repository verifier's standard-library TOML parser.
 - jq, which the native companion-install lookup uses to locate the installed plugin
   package.
 
@@ -103,7 +110,7 @@ sh "$plugin_dir/scripts/install-agents.sh" --check
 ~~~
 
 To update the marketplace plugin and, for native mode, migrate the exact recognized
-v0.2.0 companion files:
+v0.2.0 and v0.4.0 companion files:
 
 ~~~sh
 codex plugin marketplace upgrade sol-advisor
@@ -114,12 +121,13 @@ sh "$plugin_dir/scripts/install-agents.sh"
 sh "$plugin_dir/scripts/install-agents.sh" --check
 ~~~
 
-Version 0.4.0 retains the historical byte-exact v0.2.0 migration for
-`sol-advisor-luna-implementer.toml` and `sol-advisor-terra-implementer.toml` files.
-Normal installer mode replaces the exact legacy Terra file with the current Terra /
-High template, removes the exact legacy Luna file, and refuses modified, nonregular,
-or symlinked destinations without partial agent-file mutation. `--check` is
-non-mutating and fails until both current role files match exactly and Luna is absent.
+The installer retains the historical byte-exact v0.2.0 migration for
+`sol-advisor-luna-implementer.toml` and `sol-advisor-terra-implementer.toml`, and
+migrates only the byte-exact v0.4.0 `sol-advisor-sol-reviewer.toml` template.
+Normal installer mode replaces those recognized legacy files with current templates,
+removes the exact legacy Luna file, and refuses modified, nonregular, or symlinked
+destinations without partial agent-file mutation. `--check` is non-mutating and fails
+until both current role files match exactly and Luna is absent.
 The native routing update was motivated by
 [Eric Provencher's X post](https://x.com/pvncher/status/2083300990350954981).
 
@@ -149,6 +157,14 @@ For a disposable fixture or a non-default local session root, pass it explicitly
 
 ~~~sh
 sh "$plugin_dir/scripts/inspect-agent-runtime.sh" --sessions-dir /absolute/path/to/sessions "$thread_id"
+~~~
+
+For every Sol reviewer, isolation metadata is mandatory. Add the strict flag (and use
+it with `--sessions-dir` when needed); absent, empty, malformed, or conflicting policy
+and permission types stop the review instead of being treated as `null` evidence:
+
+~~~sh
+sh "$plugin_dir/scripts/inspect-agent-runtime.sh" --require-isolation-metadata "$thread_id"
 ~~~
 
 The helper searches only rollout filenames ending in that exact thread id, then emits a
@@ -316,11 +332,11 @@ jq empty .agents/plugins/marketplace.json plugins/sol-advisor/.codex-plugin/plug
 ~~~
 
 The verifier validates JSON and TOML, the two exact native role pins, clean/current/
-missing and idempotent installer behavior, exact-v0.2.0 migration, refusal/non-
-mutation gates, runtime-inspector safe fixtures, native and Luna lane contracts,
-version/UI metadata, stale-claim guards, and shell syntax. The uv commands supply the
-validators' PyYAML dependency in a disposable environment. They do not install the
-marketplace or mutate Codex configuration.
+missing and idempotent installer behavior, exact-v0.2.0 and v0.4.0 migration,
+refusal/non-mutation gates, strict runtime-inspector isolation fixtures, native and
+Luna lane contracts, version/UI metadata, stale-claim guards, and shell syntax. The
+uv commands supply the validators' PyYAML dependency in a disposable environment.
+They do not install the marketplace or mutate Codex configuration.
 
 ## License
 

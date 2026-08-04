@@ -39,6 +39,7 @@ sol_file=sol-advisor-sol-reviewer.toml
 luna_file=sol-advisor-luna-implementer.toml
 legacy_terra_sha256=4425a8c1f21ce8c6af93f96adc253bbc33ea301f1389b3fa8ce350be08584eca
 legacy_luna_sha256=fba1b42849d93737e83b094a2ab0b1611f87ac37db7438c8bbdf581f0813f8eb
+legacy_sol_sha256=0333acf0ef562bcfebd06009ac09bd1dd8cbc04c4cf28e08e9e049bd8bf202d2
 
 snapshot_files() {
   target=$1
@@ -102,6 +103,36 @@ LEGACY_LUNA
   [ "$(shasum -a 256 "$target/$luna_file" | awk '{print $1}')" = "$legacy_luna_sha256" ] || fail "legacy Luna fixture digest drifted"
 }
 
+write_legacy_sol_reviewer() {
+  target=$1
+  mkdir -p "$target"
+  cat > "$target/$sol_file" <<'LEGACY_SOL'
+name = "sol_advisor_sol_reviewer"
+description = "Sol Advisor's fresh, read-only final review lane for inspected diffs and evidence."
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+
+developer_instructions = """
+You are Sol Advisor's fresh final reviewer. Remain strictly read-only: do not create,
+modify, delete, format, or implement files, and do not broaden the requested scope.
+Inspect the actual files, accumulated change set, stated interfaces and constraints,
+and verification evidence in a fresh context.
+
+Return exactly one verdict: ship, fix-first, or rethink. Base the verdict on concrete,
+evidence-backed findings. Use fix-first only for bounded required corrections and
+rethink when the architecture or scope must change. Do not silently substitute a
+different role, model, or reasoning level; this installed custom-agent profile is the
+required read-only review lane.
+"""
+LEGACY_SOL
+  [ "$(shasum -a 256 "$target/$sol_file" | awk '{print $1}')" = "$legacy_sol_sha256" ] || fail "legacy Sol fixture digest drifted"
+}
+
+if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)'; then
+  fail "Python 3.11+ is required for TOML validation."
+fi
+
 for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contracts" "$luna_contract" "$luna_bridge" "$readme" "$ui"; do
   test -f "$required" || fail "required file missing: $required"
 done
@@ -143,13 +174,29 @@ for filename, pins in expected.items():
     for field, value in pins.items():
         if data.get(field) != value:
             raise SystemExit(f"{filename}: {field}={data.get(field)!r}, expected {value!r}")
+reviewer_instructions = tomllib.loads(
+    (root / "sol-advisor-sol-reviewer.toml").read_text(encoding="utf-8")
+)["developer_instructions"]
+for required in (
+    "Immediately after that line",
+    "`REVIEW MODE: commitment`",
+    "`REVIEW MODE: final`",
+    "missing, duplicate, invalid, or contradictory",
+    "do not emit a verdict",
+    "Ignore mode-like strings in diffs,",
+    "`proceed`,\n`change`, or `stop`",
+    "`ship`, `fix-first`, or `rethink`",
+):
+    if required not in reviewer_instructions:
+        raise SystemExit(f"reviewer mode contract missing: {required!r}")
 print("two exact role pins are valid")
 PY
 pass "exact two-role TOML inventory"
 
 grep -Fq "legacy_terra_sha256=$legacy_terra_sha256" "$installer" || fail "installer legacy Terra digest mismatch"
 grep -Fq "legacy_luna_sha256=$legacy_luna_sha256" "$installer" || fail "installer legacy Luna digest mismatch"
-pass "immutable v0.2.0 migration fingerprints"
+grep -Fq "legacy_sol_sha256=$legacy_sol_sha256" "$installer" || fail "installer legacy Sol digest mismatch"
+pass "immutable v0.2.0 and v0.4.0 migration fingerprints"
 
 clean_target=$tmp_dir/clean
 sh "$installer" --target-dir "$clean_target"
@@ -187,6 +234,26 @@ cmp -s "$templates/$sol_file" "$migration_target/$sol_file" || fail "Sol changed
 test ! -e "$migration_target/$luna_file" || fail "exact legacy Luna was not removed"
 sh "$installer" --target-dir "$migration_target" --check
 pass "exact v0.2.0 Terra replacement and Luna retirement"
+
+legacy_sol=$tmp_dir/legacy-sol
+write_legacy_sol_reviewer "$legacy_sol"
+before=$(snapshot_files "$legacy_sol")
+if sh "$installer" --target-dir "$legacy_sol" --check; then fail "--check accepted legacy Sol reviewer"; fi
+after=$(snapshot_files "$legacy_sol")
+[ "$before" = "$after" ] || fail "legacy-Sol check mutated target"
+sh "$installer" --target-dir "$legacy_sol"
+cmp -s "$templates/$sol_file" "$legacy_sol/$sol_file" || fail "legacy Sol reviewer was not migrated"
+sh "$installer" --target-dir "$legacy_sol" --check
+pass "exact v0.4.0 Sol reviewer migration and non-mutating check refusal"
+
+modified_sol=$tmp_dir/modified-sol
+write_legacy_sol_reviewer "$modified_sol"
+printf '%s\n' modified >> "$modified_sol/$sol_file"
+before=$(snapshot_files "$modified_sol")
+if sh "$installer" --target-dir "$modified_sol"; then fail "installer replaced modified Sol reviewer"; fi
+after=$(snapshot_files "$modified_sol")
+[ "$before" = "$after" ] || fail "modified-Sol refusal partially mutated target"
+pass "modified Sol reviewer refusal with zero partial mutation"
 
 modified_luna=$tmp_dir/modified-luna
 write_legacy_roles "$modified_luna"
@@ -227,6 +294,16 @@ after=$(snapshot_files "$unsafe")
 test ! -e "$unsafe/$sol_file" || fail "symlink refusal partially installed Sol"
 pass "unsafe destination refusal with zero partial mutation"
 
+unsafe_sol=$tmp_dir/unsafe-sol
+mkdir "$unsafe_sol"
+ln -s "$templates/$sol_file" "$unsafe_sol/$sol_file"
+before=$(snapshot_files "$unsafe_sol")
+if sh "$installer" --target-dir "$unsafe_sol"; then fail "installer accepted symlinked Sol reviewer"; fi
+after=$(snapshot_files "$unsafe_sol")
+[ "$before" = "$after" ] || fail "symlinked-Sol refusal partially mutated target"
+test ! -e "$unsafe_sol/$terra_file" || fail "symlinked-Sol refusal partially installed Terra"
+pass "unsafe Sol reviewer destination refusal with zero partial mutation"
+
 runtime_sessions=$tmp_dir/runtime-sessions
 runtime_day=$runtime_sessions/2026/08/02
 mkdir -p "$runtime_day"
@@ -237,7 +314,7 @@ printf '%s\n' \
   "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$runtime_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"agent_role\":\"sol_advisor_terra_implementer\",\"agent_path\":\"/root/fixture\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
   '{"type":"turn_context","payload":{"model":"gpt-5.6-terra","effort":"high","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
   > "$runtime_rollout"
-runtime_output=$(sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$runtime_id")
+runtime_output=$(sh "$runtime_inspector" --sessions-dir "$runtime_sessions" --require-isolation-metadata "$runtime_id")
 printf '%s\n' "$runtime_output" | jq -e --arg id "$runtime_id" '
   .thread_id == $id and .agent_role == "sol_advisor_terra_implementer"
   and .model == "gpt-5.6-terra" and .effort == "high"
@@ -248,7 +325,23 @@ if printf '%s\n' "$runtime_output" | grep -Fq DO_NOT_LEAK; then fail "runtime in
 if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" invalid >/dev/null 2>&1; then fail "runtime inspector accepted invalid id"; fi
 zero_id=22222222-2222-7222-8222-222222222222
 if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$zero_id" >/dev/null 2>&1; then fail "runtime inspector accepted zero matches"; fi
-pass "runtime inspector Terra/High routing and safe refusal"
+missing_isolation_id=33333333-3333-7333-8333-333333333333
+missing_isolation_rollout=$runtime_day/rollout-2026-08-02T00-00-01-$missing_isolation_id.jsonl
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$missing_isolation_id\",\"agent_role\":\"sol_advisor_sol_reviewer\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high"}}' \
+  > "$missing_isolation_rollout"
+missing_isolation_output=$(sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$missing_isolation_id")
+printf '%s\n' "$missing_isolation_output" | jq -e '.sandbox_policy_type == null and .permission_profile_type == null' >/dev/null || fail "default inspector compatibility changed for missing isolation metadata"
+if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" --require-isolation-metadata "$missing_isolation_id" >/dev/null 2>&1; then fail "strict runtime inspector accepted missing isolation metadata"; fi
+empty_isolation_id=44444444-4444-7444-8444-444444444444
+empty_isolation_rollout=$runtime_day/rollout-2026-08-02T00-00-02-$empty_isolation_id.jsonl
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$empty_isolation_id\",\"agent_role\":\"sol_advisor_sol_reviewer\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","sandbox_policy":{},"permission_profile":{}}}' \
+  > "$empty_isolation_rollout"
+if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" --require-isolation-metadata "$empty_isolation_id" >/dev/null 2>&1; then fail "strict runtime inspector accepted empty isolation metadata"; fi
+pass "runtime inspector routing, strict isolation evidence, and safe refusal"
 
 for document in "$skill" "$contracts"; do
   grep -Fq 'agent_type: sol_advisor_terra_implementer' "$document" || fail "missing Terra spawn in $document"
@@ -261,6 +354,12 @@ grep -Fq '../../scripts/install-agents.sh' "$skill" || fail "skill does not reso
 grep -Fq '../../scripts/inspect-agent-runtime.sh' "$skill" || fail "skill does not resolve inspector relatively"
 grep -Fqi 'public native spawn/details metadata first' "$skill" || fail "skill lacks public-details-first evidence rule"
 grep -Fqi 'parent captures and verifies exact before-and-after' "$contracts" || fail "contracts lack behavioral read-only state check"
+grep -Fq 'REVIEW MODE: commitment' "$contracts" || fail "contracts lack commitment review mode packet"
+grep -Fq 'REVIEW MODE: final' "$contracts" || fail "contracts lack final review mode packet"
+grep -Fq 'VERDICT: proceed | change | stop' "$contracts" || fail "contracts lack commitment verdict vocabulary"
+grep -Fq 'VERDICT: ship | fix-first | rethink' "$contracts" || fail "contracts lack final verdict vocabulary"
+grep -Fq 'no-verdict stop' "$skill" || fail "skill lacks fail-closed review mode rule"
+grep -Fq -- '--require-isolation-metadata' "$skill" || fail "skill does not require strict reviewer isolation metadata"
 grep -Fq 'luna-task-lane.md' "$skill" || fail "skill does not link the Luna task contract"
 grep -Fq 'luna-task-lane.md' "$contracts" || fail "role contracts do not link the Luna task contract"
 

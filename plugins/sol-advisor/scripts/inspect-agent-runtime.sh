@@ -5,12 +5,15 @@ set -eu
 
 usage() {
   cat <<'EOF'
-Usage: inspect-agent-runtime.sh [--sessions-dir DIR] THREAD_ID
+Usage: inspect-agent-runtime.sh [--sessions-dir DIR] [--require-isolation-metadata] THREAD_ID
 
 Read the one rollout file whose filename ends with THREAD_ID and emit a compact JSON
 object containing only safe routing metadata. Without --sessions-dir, the sessions
 root is "$CODEX_HOME/sessions" when CODEX_HOME is already set, otherwise
-"$HOME/.codex/sessions".
+"$HOME/.codex/sessions". With --require-isolation-metadata, reject the rollout when
+any turn context lacks a non-empty string sandbox_policy.type or
+permission_profile.type. Without that flag, those allowlisted output fields remain
+null for callers that do not require reviewer-isolation evidence.
 EOF
 }
 
@@ -20,24 +23,41 @@ fail() {
 }
 
 sessions_dir=''
-case "$#" in
-  1)
-    thread_id=$1
-    ;;
-  3)
-    [ "$1" = "--sessions-dir" ] || {
+require_isolation_metadata=false
+thread_id=''
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --sessions-dir)
+      [ -z "$sessions_dir" ] || fail "--sessions-dir may be supplied only once."
+      shift
+      [ "$#" -gt 0 ] || fail "--sessions-dir requires a non-empty directory."
+      [ -n "$1" ] || fail "--sessions-dir requires a non-empty directory."
+      sessions_dir=$1
+      ;;
+    --require-isolation-metadata)
+      [ "$require_isolation_metadata" = false ] || fail "--require-isolation-metadata may be supplied only once."
+      require_isolation_metadata=true
+      ;;
+    --*)
       usage >&2
       exit 2
-    }
-    [ -n "$2" ] || fail "--sessions-dir requires a non-empty directory."
-    sessions_dir=$2
-    thread_id=$3
-    ;;
-  *)
-    usage >&2
-    exit 2
-    ;;
-esac
+      ;;
+    *)
+      [ -z "$thread_id" ] || {
+        usage >&2
+        exit 2
+      }
+      thread_id=$1
+      ;;
+  esac
+  shift
+done
+
+[ -n "$thread_id" ] || {
+  usage >&2
+  exit 2
+}
 
 if ! printf '%s\n' "$thread_id" | LC_ALL=C grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; then
   fail "THREAD_ID must be a lowercase UUID."
@@ -96,7 +116,7 @@ IFS= read -r rollout_file < "$matches_file" || fail "could not read the matched 
 
 # The jq program reads only the matched JSONL and constructs a new allowlisted object.
 # It rejects absent or conflicting required routing values instead of inferring them.
-if ! jq -ce -s --arg expected_thread_id "$thread_id" '
+if ! jq -ce -s --arg expected_thread_id "$thread_id" --argjson require_isolation_metadata "$require_isolation_metadata" '
   def string_or_null:
     if type == "string" then . else null end;
 
@@ -130,6 +150,10 @@ if ! jq -ce -s --arg expected_thread_id "$thread_id" '
       error("conflicting models")
     elif ($efforts | unique | length) != 1 then
       error("conflicting efforts")
+    elif $require_isolation_metadata and any($sandbox_types[]; . == null or . == "") then
+      error("missing sandbox policy type required for isolation evidence")
+    elif $require_isolation_metadata and any($permission_types[]; . == null or . == "") then
+      error("missing permission profile type required for isolation evidence")
     elif ($sandbox_types | unique | length) != 1 then
       error("conflicting sandbox policy types")
     elif ($permission_types | unique | length) != 1 then
