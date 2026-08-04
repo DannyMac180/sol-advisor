@@ -11,7 +11,7 @@
   "interface": {
     "displayName": "Sol Advisor",
     "shortDescription": "Orchestrate with Sol, use native Terra / High or opt-in Luna tasks, and verify the accepted diff.",
-    "longDescription": "Sol Advisor gives Codex two explicit delivery modes: GPT-5.6 Sol keeps architecture, decomposition, verification, and acceptance in the primary session; the native mode uses a separately installed GPT-5.6 Terra / High role and a fresh Sol reviewer, while the opt-in Luna mode creates user-visible GPT-5.6 Luna / Max tasks through list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread and keeps review, corrections, PR authorization, and dependent-stack ordering in the primary session.",
+    "longDescription": "Sol Advisor gives Codex two explicit delivery modes: GPT-5.6 Sol keeps architecture, decomposition, verification, and acceptance in the primary session; the native mode uses a separately installed GPT-5.6 Terra / High role and a fresh Sol reviewer, while the opt-in Luna mode creates user-visible GPT-5.6 Luna / Max tasks through Codex app task tools such as list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread and keeps review, corrections, PR authorization, and dependent-stack ordering in the primary session.",
     "developerName": "Daniel McAteer",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
