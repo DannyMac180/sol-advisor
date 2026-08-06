@@ -40,6 +40,7 @@ sol_file=sol-advisor-sol-reviewer.toml
 luna_file=sol-advisor-luna-implementer.toml
 legacy_terra_sha256=4425a8c1f21ce8c6af93f96adc253bbc33ea301f1389b3fa8ce350be08584eca
 legacy_luna_sha256=fba1b42849d93737e83b094a2ab0b1611f87ac37db7438c8bbdf581f0813f8eb
+legacy_terra_v04_sha256=06c318e5e93f37452635906394e6ea69fb6a65ba9e6ad7172d37b444e0dc871d
 
 snapshot_files() {
   target=$1
@@ -103,6 +104,31 @@ LEGACY_LUNA
   [ "$(shasum -a 256 "$target/$luna_file" | awk '{print $1}')" = "$legacy_luna_sha256" ] || fail "legacy Luna fixture digest drifted"
 }
 
+write_v04_terra() {
+  target=$1
+  mkdir -p "$target"
+  cat > "$target/$terra_file" <<'LEGACY_TERRA_V04'
+name = "sol_advisor_terra_implementer"
+description = "Sol Advisor's sole implementation lane for routine and complex work."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
+
+developer_instructions = """
+You are Sol Advisor's sole implementation worker for routine, context-heavy,
+higher-risk, and wider-blast-radius work. Execute the supplied five-part specification
+within the settled architecture. Preserve every stated interface and constraint, stay
+within the owned file set, and document material judgment calls.
+
+You are not alone in the codebase: preserve concurrent edits and do not revert
+unrelated work. Surface ambiguity, scope conflicts, or verification failures rather
+than redesigning the architecture without direction. Run the requested checks and
+report actual evidence. Do not silently substitute a different role, model, or
+reasoning level; this installed custom-agent profile is the only implementation lane.
+"""
+LEGACY_TERRA_V04
+  [ "$(shasum -a 256 "$target/$terra_file" | awk '{print $1}')" = "$legacy_terra_v04_sha256" ] || fail "legacy v0.4 Terra fixture digest drifted"
+}
+
 for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contracts" "$deepseek_contract" "$luna_contract" "$readme" "$ui"; do
   test -f "$required" || fail "required file missing: $required"
 done
@@ -156,7 +182,20 @@ pass "exact three-role TOML inventory"
 
 grep -Fq "legacy_terra_sha256=$legacy_terra_sha256" "$installer" || fail "installer legacy Terra digest mismatch"
 grep -Fq "legacy_luna_sha256=$legacy_luna_sha256" "$installer" || fail "installer legacy Luna digest mismatch"
-pass "immutable v0.2.0 migration fingerprints"
+grep -Fq "legacy_terra_v04_sha256=$legacy_terra_v04_sha256" "$installer" || fail "installer legacy v0.4 Terra digest mismatch"
+pass "immutable legacy migration fingerprints"
+
+python3 - "$manifest" <<'PY'
+import json
+import sys
+
+data = json.loads(open(sys.argv[1], encoding="utf-8").read())
+prompts = data.get("interface", {}).get("defaultPrompt")
+if not isinstance(prompts, list) or not prompts or any(not isinstance(prompt, str) or len(prompt) > 128 for prompt in prompts):
+    raise SystemExit(f"defaultPrompt entries must be non-empty strings of at most 128 characters: {prompts!r}")
+print("default prompts fit the 128-character cap")
+PY
+pass "default prompt length cap"
 
 clean_target=$tmp_dir/clean
 sh "$installer" --target-dir "$clean_target"
@@ -198,6 +237,15 @@ cmp -s "$templates/$sol_file" "$migration_target/$sol_file" || fail "Sol changed
 test ! -e "$migration_target/$luna_file" || fail "exact legacy Luna was not removed"
 sh "$installer" --target-dir "$migration_target" --check
 pass "exact v0.2.0 Terra replacement and Luna retirement"
+
+v04_migration_target=$tmp_dir/v04-migration
+write_v04_terra "$v04_migration_target"
+sh "$installer" --target-dir "$v04_migration_target"
+cmp -s "$templates/$terra_file" "$v04_migration_target/$terra_file" || fail "v0.4 Terra was not migrated"
+cmp -s "$templates/$deepseek_file" "$v04_migration_target/$deepseek_file" || fail "DeepSeek was not installed during v0.4 migration"
+cmp -s "$templates/$sol_file" "$v04_migration_target/$sol_file" || fail "Sol was not installed during v0.4 migration"
+sh "$installer" --target-dir "$v04_migration_target" --check
+pass "exact v0.4 Terra replacement"
 
 modified_luna=$tmp_dir/modified-luna
 write_legacy_roles "$modified_luna"

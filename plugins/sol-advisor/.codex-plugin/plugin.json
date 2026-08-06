@@ -16,6 +16,6 @@
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
     "websiteURL": "https://github.com/DannyMac180/sol-advisor",
-    "defaultPrompt": ["Use Sol Advisor's native lane to build this feature with capability-gated DeepSeek or Terra, report any pre-work fallback, verify it, and obtain the fresh Sol review before completion.", "Use the Luna task lane only when I explicitly authorize it; keep primary review and acceptance in this task."]
+    "defaultPrompt": ["Use Sol Advisor native mode: prefer verified DeepSeek, fall back to Terra before work, verify, and get a fresh Sol review.", "Use the Luna task lane only when I explicitly authorize it; keep primary review and acceptance in this task."]
   }
 }

@@ -117,7 +117,8 @@ sh "$plugin_dir/scripts/install-agents.sh"
 sh "$plugin_dir/scripts/install-agents.sh" --check
 ~~~
 
-Version 0.5.0 retains the historical byte-exact v0.2.0 migration for
+Version 0.5.0 retains the historical byte-exact v0.2.0 migration and adds the
+byte-exact v0.4.0 Terra migration for
 `sol-advisor-luna-implementer.toml` and `sol-advisor-terra-implementer.toml` files.
 Normal installer mode replaces the exact legacy Terra file with the current Terra /
 High template, removes the exact legacy Luna file, and refuses modified, nonregular,
