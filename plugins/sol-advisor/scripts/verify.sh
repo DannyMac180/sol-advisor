@@ -1,5 +1,5 @@
 #!/bin/sh
-# Repository-local verification for Sol Advisor's selective native three-role architecture.
+# Repository-local verification for Sol Advisor's selective native four-role architecture.
 
 set -eu
 
@@ -15,6 +15,7 @@ templates=$plugin_dir/agents
 manifest=$plugin_dir/.codex-plugin/plugin.json
 skill=$plugin_dir/skills/orchestration/SKILL.md
 contracts=$plugin_dir/skills/orchestration/references/role-contracts.md
+deepseek_contract=$plugin_dir/skills/orchestration/references/deepseek-native-lane.md
 operations=$plugin_dir/skills/orchestration/references/operations.md
 readme=$repo_dir/README.md
 ui=$plugin_dir/skills/orchestration/agents/openai.yaml
@@ -38,9 +39,11 @@ tmp_dir=$(mktemp -d "$tmp_base/sol-advisor-verify.XXXXXX") || fail "could not cr
 
 luna_file=sol-advisor-luna-implementer.toml
 terra_file=sol-advisor-terra-implementer.toml
+deepseek_file=sol-advisor-deepseek-implementer.toml
 sol_file=sol-advisor-sol-reviewer.toml
 legacy_luna_sha256=fba1b42849d93737e83b094a2ab0b1611f87ac37db7438c8bbdf581f0813f8eb
 legacy_terra_sha256=4425a8c1f21ce8c6af93f96adc253bbc33ea301f1389b3fa8ce350be08584eca
+legacy_terra_v040_sha256=06c318e5e93f37452635906394e6ea69fb6a65ba9e6ad7172d37b444e0dc871d
 legacy_luna_v050_sha256=5cfaf77f14757074ca5d3cfecd0b8204c91dc14eff8d6119985c64416ddf4853
 legacy_terra_v050_sha256=dc329fe87f6f6610c13157ec16432f91c79cf5a541ee3e7448f6afb165dd18ce
 
@@ -156,7 +159,32 @@ V050_TERRA
   [ "$(shasum -a 256 "$target/$terra_file" | awk '{print $1}')" = "$legacy_terra_v050_sha256" ] || fail "v0.5.0 Terra fixture digest drifted"
 }
 
-for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contracts" "$operations" "$readme" "$ui"; do
+write_v040_terra() {
+  target=$1
+  mkdir -p "$target"
+  cat > "$target/$terra_file" <<'V040_TERRA'
+name = "sol_advisor_terra_implementer"
+description = "Sol Advisor's sole implementation lane for routine and complex work."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
+
+developer_instructions = """
+You are Sol Advisor's sole implementation worker for routine, context-heavy,
+higher-risk, and wider-blast-radius work. Execute the supplied five-part specification
+within the settled architecture. Preserve every stated interface and constraint, stay
+within the owned file set, and document material judgment calls.
+
+You are not alone in the codebase: preserve concurrent edits and do not revert
+unrelated work. Surface ambiguity, scope conflicts, or verification failures rather
+than redesigning the architecture without direction. Run the requested checks and
+report actual evidence. Do not silently substitute a different role, model, or
+reasoning level; this installed custom-agent profile is the only implementation lane.
+"""
+V040_TERRA
+  [ "$(shasum -a 256 "$target/$terra_file" | awk '{print $1}')" = "$legacy_terra_v040_sha256" ] || fail "v0.4.0 Terra fixture digest drifted"
+}
+
+for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contracts" "$deepseek_contract" "$operations" "$readme" "$ui"; do
   test -f "$required" || fail "required file missing: $required"
 done
 test ! -e "$retired_contract" || fail "retired separate workflow contract remains: $retired_contract"
@@ -167,10 +195,22 @@ jq empty "$manifest"
 grep -Fq 'SELECTIVE ROUTE' "$manifest" || fail "manifest omits route declaration"
 grep -Fq 'solo is the default' "$manifest" || fail "manifest omits solo default"
 grep -Fq 'delegate uses native GPT-5.6 Luna / Max' "$manifest" || fail "manifest omits delegate role contract"
+grep -Fq 'capability-gated deepseek/deepseek-v4-flash / High' "$manifest" || fail "manifest omits DeepSeek role contract"
 grep -Fq 'audit uses a fresh read-only GPT-5.6 Sol / High review' "$manifest" || fail "manifest omits audit contract"
 grep -Fq 'full combines one selected implementer' "$manifest" || fail "manifest omits exceptional full contract"
 grep -Fq 'fails closed' "$manifest" || fail "manifest omits fail-closed evidence rule"
-pass "manifest JSON, v0.6.0 release, and selective-routing language"
+python3 - "$manifest" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    data = json.load(handle)
+prompts = data.get("interface", {}).get("defaultPrompt")
+if not isinstance(prompts, list) or not prompts or any(not isinstance(prompt, str) or len(prompt) > 128 for prompt in prompts):
+    raise SystemExit("every interface.defaultPrompt entry must be a string no longer than 128 characters")
+print("default prompts remain within the 128-character cap")
+PY
+pass "manifest JSON, v0.6.0 release, prompts, and selective-routing language"
 
 python3 - "$templates" <<'PY'
 from pathlib import Path
@@ -187,6 +227,11 @@ expected = {
     "sol-advisor-terra-implementer.toml": {
         "name": "sol_advisor_terra_implementer",
         "model": "gpt-5.6-terra",
+        "model_reasoning_effort": "high",
+    },
+    "sol-advisor-deepseek-implementer.toml": {
+        "name": "sol_advisor_deepseek_implementer",
+        "model": "deepseek/deepseek-v4-flash",
         "model_reasoning_effort": "high",
     },
     "sol-advisor-sol-reviewer.toml": {
@@ -207,19 +252,20 @@ for filename, pins in expected.items():
     for field, value in pins.items():
         if data.get(field) != value:
             raise SystemExit(f"{filename}: {field}={data.get(field)!r}, expected {value!r}")
-print("three exact role pins are valid")
+print("four exact role pins are valid")
 PY
-pass "exact three-role TOML inventory"
+pass "exact four-role TOML inventory"
 
 grep -Fq "legacy_luna_sha256=$legacy_luna_sha256" "$installer" || fail "installer legacy Luna digest mismatch"
 grep -Fq "legacy_terra_sha256=$legacy_terra_sha256" "$installer" || fail "installer legacy Terra digest mismatch"
+grep -Fq "legacy_terra_v040_sha256=$legacy_terra_v040_sha256" "$installer" || fail "installer v0.4.0 Terra digest mismatch"
 grep -Fq "legacy_luna_v050_sha256=$legacy_luna_v050_sha256" "$installer" || fail "installer v0.5.0 Luna digest mismatch"
 grep -Fq "legacy_terra_v050_sha256=$legacy_terra_v050_sha256" "$installer" || fail "installer v0.5.0 Terra digest mismatch"
 pass "immutable historical migration fingerprints"
 
 clean_target=$tmp_dir/clean
 sh "$installer" --target-dir "$clean_target"
-for role in "$luna_file" "$terra_file" "$sol_file"; do
+for role in "$luna_file" "$terra_file" "$deepseek_file" "$sol_file"; do
   cmp -s "$templates/$role" "$clean_target/$role" || fail "clean install mismatch: $role"
 done
 sh "$installer" --target-dir "$clean_target" --check
@@ -227,7 +273,7 @@ before=$(snapshot_files "$clean_target")
 sh "$installer" --target-dir "$clean_target"
 after=$(snapshot_files "$clean_target")
 [ "$before" = "$after" ] || fail "idempotent install changed current roles"
-pass "clean install, exact check, and idempotence"
+pass "clean four-role install, exact check, and idempotence"
 
 selective_target=$tmp_dir/selective
 sh "$installer" --target-dir "$selective_target"
@@ -280,7 +326,7 @@ pass "missing-target check refusal is non-mutating"
 
 codex_home=$tmp_dir/codex-home
 CODEX_HOME="$codex_home" sh "$installer"
-for role in "$luna_file" "$terra_file" "$sol_file"; do
+for role in "$luna_file" "$terra_file" "$deepseek_file" "$sol_file"; do
   cmp -s "$templates/$role" "$codex_home/agents/$role" || fail "CODEX_HOME install mismatch: $role"
 done
 test ! -e "$codex_home/config.toml" || fail "installer created config.toml"
@@ -288,7 +334,7 @@ relative_parent=$tmp_dir/relative-parent
 mkdir "$relative_parent"
 (cd "$relative_parent" && sh "$installer" --target-dir relative-agents)
 cmp -s "$templates/$luna_file" "$relative_parent/relative-agents/$luna_file" || fail "relative target Luna mismatch"
-pass "CODEX_HOME and relative target behavior"
+pass "CODEX_HOME and relative four-role target behavior"
 
 migration_target=$tmp_dir/migration
 write_legacy_roles "$migration_target"
@@ -307,6 +353,15 @@ for role in "$luna_file" "$terra_file" "$sol_file"; do
 done
 sh "$installer" --target-dir "$v050_migration_target" --check
 pass "exact v0.5.0 Luna/Terra migration"
+
+v040_migration_target=$tmp_dir/v040-migration
+write_v040_terra "$v040_migration_target"
+sh "$installer" --target-dir "$v040_migration_target"
+for role in "$luna_file" "$terra_file" "$deepseek_file" "$sol_file"; do
+  cmp -s "$templates/$role" "$v040_migration_target/$role" || fail "v0.4.0 migration mismatch: $role"
+done
+sh "$installer" --target-dir "$v040_migration_target" --check
+pass "exact v0.4.0 Terra migration"
 
 modified_v050_luna=$tmp_dir/modified-v050-luna
 write_v050_roles "$modified_v050_luna"
@@ -361,6 +416,7 @@ if sh "$installer" --target-dir "$unsafe"; then fail "installer accepted symlink
 after=$(snapshot_files "$unsafe")
 [ "$before" = "$after" ] || fail "symlink refusal partially mutated target"
 test ! -e "$unsafe/$terra_file" || fail "symlink refusal partially installed Terra"
+test ! -e "$unsafe/$deepseek_file" || fail "symlink refusal partially installed DeepSeek"
 test ! -e "$unsafe/$sol_file" || fail "symlink refusal partially installed Sol"
 pass "unsafe destination refusal with zero partial mutation"
 
@@ -387,15 +443,38 @@ zero_id=22222222-2222-7222-8222-222222222222
 if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$zero_id" >/dev/null 2>&1; then fail "runtime inspector accepted zero matches"; fi
 pass "runtime inspector Luna/Max routing and safe refusal"
 
+deepseek_id=33333333-3333-7333-8333-333333333333
+deepseek_rollout=$runtime_day/rollout-2026-08-15T00-00-01-$deepseek_id.jsonl
+printf '%s\n' \
+  '{"type":"response_item","payload":{"prompt":"DO_NOT_LEAK_DEEPSEEK_PROMPT"}}' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$deepseek_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"agent_role\":\"sol_advisor_deepseek_implementer\",\"agent_path\":\"/root/fixture\",\"model_provider\":\"deepseek\",\"cwd\":\"/fixture\"}}" \
+  '{"type":"turn_context","payload":{"model":"deepseek/deepseek-v4-flash","effort":"high","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
+  > "$deepseek_rollout"
+deepseek_output=$(sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$deepseek_id")
+printf '%s\n' "$deepseek_output" | jq -e --arg id "$deepseek_id" '
+  .thread_id == $id and .agent_role == "sol_advisor_deepseek_implementer"
+  and .model == "deepseek/deepseek-v4-flash" and .effort == "high"
+  and .sandbox_policy_type == "danger-full-access"
+  and .permission_profile_type == "disabled"
+' >/dev/null || fail "runtime inspector returned wrong DeepSeek/High evidence"
+if printf '%s\n' "$deepseek_output" | grep -Fq DO_NOT_LEAK; then fail "runtime inspector leaked DeepSeek payload"; fi
+pass "runtime inspector DeepSeek/High routing"
+
 for document in "$contracts" "$operations"; do
   grep -Fq 'agent_type: sol_advisor_luna_implementer' "$document" || fail "missing Luna spawn in $document"
   grep -Fq 'agent_type: sol_advisor_terra_implementer' "$document" || fail "missing Terra spawn in $document"
+  grep -Fq 'agent_type: sol_advisor_deepseek_implementer' "$document" || fail "missing DeepSeek spawn in $document"
   grep -Fq 'agent_type: sol_advisor_sol_reviewer' "$document" || fail "missing Sol spawn in $document"
   grep -Fq 'fork_turns: none' "$document" || fail "missing fresh context in $document"
   if grep -Eq 'agent_type:.*terra_max' "$document"; then fail "retired Terra-Max spawn remains in $document"; fi
   if grep -Eq '^[[:space:]]*(model|reasoning_effort):' "$document"; then fail "per-spawn override remains in $document"; fi
 done
 grep -Fq 'references/operations.md' "$skill" || fail "skill does not link operations reference"
+grep -Fq 'deepseek-native-lane.md' "$skill" || fail "skill does not link DeepSeek contract"
+grep -Fq 'deepseek-native-lane.md' "$contracts" || fail "role contracts do not link DeepSeek contract"
+for document in "$skill" "$contracts" "$deepseek_contract" "$readme"; do
+  grep -Fq 'deepseek/deepseek-v4-flash' "$document" || fail "$document omits the exact DeepSeek model"
+done
 grep -Fq '../../scripts/install-agents.sh' "$operations" || fail "operations does not resolve installer relatively"
 grep -Fq '../../scripts/inspect-agent-runtime.sh' "$operations" || fail "operations does not resolve inspector relatively"
 grep -Fq 'SELECTIVE ROUTE' "$skill" || fail "skill omits route declaration"
@@ -429,6 +508,7 @@ pass "native role contracts, selective route declaration, escalation, and correc
 for phrase in \
   'agent_type: sol_advisor_luna_implementer' \
   'agent_type: sol_advisor_terra_implementer' \
+  'agent_type: sol_advisor_deepseek_implementer' \
   'agent_type: sol_advisor_sol_reviewer' \
   'fork_turns: none' \
   'SELECTIVE ROUTE' \
@@ -465,7 +545,7 @@ grep -Fq 'before the first task tool call' "$readme" || fail "README omits route
 grep -Fq 'newly observed' "$readme" || fail "README omits escalation gate"
 grep -Fq 'never silently downgrades' "$readme" || fail "README permits silent downgrade"
 grep -Fq 'need to select or manage a lane' "$readme" || fail "README asks users to manage lanes"
-grep -Fq 'Luna / Max or Terra / High access is needed only when' "$readme" || fail "README omits conditional delegate access"
+grep -Fq 'access is needed only when the selected route delegates' "$readme" || fail "README omits conditional delegate access"
 python3 - "$readme" <<'PY'
 from pathlib import Path
 import sys

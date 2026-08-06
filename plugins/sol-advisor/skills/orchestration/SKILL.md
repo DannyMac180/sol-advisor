@@ -1,6 +1,6 @@
 ---
 name: orchestration
-description: "Codex-native risk-gated selective routing: default solo delivery, targeted native delegation or audit, and exceptional full review."
+description: "Codex-native risk-gated selective routing with optional DeepSeek delegation, targeted audit, and exceptional full review."
 ---
 
 # Sol Advisor Orchestration
@@ -12,8 +12,10 @@ acceptance. Selective routing has four exact modes: `solo`, `delegate`, `audit`,
 explicit broad or high-risk exception.
 
 Read [references/role-contracts.md](references/role-contracts.md) before the first
-delegation. Use [references/operations.md](references/operations.md) for exact spawn,
-preflight, runtime-evidence, isolation, and maintainer procedures.
+delegation. When selecting DeepSeek, also read
+[references/deepseek-native-lane.md](references/deepseek-native-lane.md). Use
+[references/operations.md](references/operations.md) for exact spawn, preflight,
+runtime-evidence, isolation, and maintainer procedures.
 
 ## Confirm the primary session
 
@@ -41,19 +43,20 @@ escalation. Details and the task-scoped preflight matrix are in operations.md.
 ## Preflight selected auxiliaries only
 
 Confirm Sol / High in the primary session. Preflight only an auxiliary selected by the
-declared route: none for solo; Luna / Max or Terra / High for delegate; fresh Sol / High
-for audit; and the selected implementer plus fresh Sol reviewer for full. Public metadata
-for role, model, and effort is authoritative. If it omits a model or effort, use the
-local inspector only for that omitted field. Missing, conflicting, unavailable, or
-unobservable evidence stops the affected lane; never silently substitute a role,
-model, effort, or reviewer.
+declared route: none for solo; Luna / Max, Terra / High, or capability-gated DeepSeek /
+High for delegate; fresh Sol / High for audit; and the selected implementer plus fresh
+Sol reviewer for full. Public metadata for role, model, and effort is authoritative. If
+it omits a model or effort, use the local inspector only for that omitted field. Missing,
+conflicting, unavailable, or unobservable evidence stops the affected lane; never
+silently substitute a role, model, effort, or reviewer.
 
 ## Route delivery without duplication
 
 - `solo`: root plans, implements, tests, and self-reviews; spawn no auxiliary.
-- `delegate`: select Luna / Max for bounded, fully specified work, or Terra / High for
-  judgment-heavy, high-risk, context-heavy, or wide-blast-radius work. The selected
-  implementer executes the complete spec; root verifies; do not request a fresh review.
+- `delegate`: select Luna / Max for bounded, fully specified work, Terra / High for
+  judgment-heavy, high-risk, context-heavy, or wide-blast-radius work, or DeepSeek /
+  High only when its exact routed capability is verified. The selected implementer
+  executes the complete spec; root verifies; do not request a fresh review.
 - `audit`: root implements and verifies; a fresh read-only Sol / High reviewer reviews
   the accumulated diff; spawn no implementer.
 - `full`: only for an explicit broad or high-risk exception. Select one implementer,
@@ -64,6 +67,21 @@ justify escalation to Terra / High only when it reveals newly observed complexit
 risk, wide blast radius, or misclassification. A corrected Luna attempt is reserved
 for a specification error and is not a prerequisite for Terra. Any route change must
 be declared and evidenced; do not silently downgrade.
+
+## Capability-gated DeepSeek implementation
+
+DeepSeek is an optional native implementer for declared `delegate` and `full` routes.
+The installed `sol_advisor_deepseek_implementer` role pins
+`deepseek/deepseek-v4-flash` at high reasoning, but installation alone is not routing
+evidence. Confirm the exact role, model, and effort through public native metadata
+before accepting the lane. An explicit DeepSeek request fails closed when that route
+is unavailable or unobservable.
+
+When the primary selects DeepSeek automatically and the spawn fails before worker work
+begins with a clear provider or surface error, report the failed selection and use
+Terra. Never fall back after DeepSeek has edited files, produced implementation output,
+or returned ambiguous routing metadata. Follow the complete
+[DeepSeek native-lane contract](references/deepseek-native-lane.md).
 
 ## Keep architect work in the primary session
 

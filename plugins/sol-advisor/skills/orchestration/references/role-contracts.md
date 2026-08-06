@@ -22,8 +22,8 @@ or high-risk exception. A later route declaration may only escalate after newly
 observed risk justifies it and supplies that evidence; never silently downgrade.
 
 Confirm Sol / High in the primary session, then preflight only auxiliaries selected by
-the route: none for solo; Luna / Max or Terra / High for delegate; fresh Sol / High
-for audit; and one selected implementer plus fresh Sol reviewer for full. Cache each
+the route: none for solo; Luna / Max, Terra / High, or DeepSeek / High for delegate;
+fresh Sol / High for audit; and one selected implementer plus fresh Sol reviewer for full. Cache each
 successful check only for the task. After spawning, complete the selected role's
 routing and reviewer-isolation checks before accepting the result:
 
@@ -31,7 +31,8 @@ routing and reviewer-isolation checks before accepting the result:
 2. Observe the selected role, model, and effort through public spawn/details metadata
    first, using the local runtime inspector only for omitted fields. Accept Luna /
    Max for bounded delegate/full implementation, Terra / High for higher-risk
-   delegate/full implementation, and Sol / High for audit/full review.
+   delegate/full implementation, DeepSeek / High only when its exact routed capability
+   is verified, and Sol / High for audit/full review.
 3. For the reviewer, capture actual sandbox policy and permission profile types.
 
 A missing, stale, unsafe, conflicting, unavailable, inconsistent, or unobservable
@@ -40,7 +41,7 @@ are pinned by custom-agent TOML, so omit native per-spawn overrides.
 
 ## Shared implementation contract
 
-Every Luna or Terra prompt must contain all five sections:
+Every Luna, DeepSeek, or Terra prompt must contain all five sections:
 
 ~~~text
 OBJECTIVE
@@ -83,14 +84,15 @@ The primary session must inspect the diff and rerun verification itself.
 ## Exact mode contracts
 
 - `solo`: root plans, implements, tests, and self-reviews. Spawn no auxiliary.
-- `delegate`: one selected Luna / Max or Terra / High implementer executes the complete
-  five-part specification. The root verifies. Do not spawn a fresh reviewer.
+- `delegate`: one selected Luna / Max, Terra / High, or DeepSeek / High implementer
+  executes the complete five-part specification. The root verifies. Do not spawn a
+  fresh reviewer.
 - `audit`: root implements and verifies. A fresh read-only Sol / High reviewer inspects
   the accumulated diff. Spawn no implementer. On `fix-first`, the root implements the
   correction, re-verifies, and obtains a new fresh reviewer.
 - `full`: use only for an explicit broad or high-risk exception. One selected Luna /
-  Max or Terra / High implementer executes the complete specification, the root
-  verifies, and a fresh read-only Sol / High reviewer inspects the accumulated diff.
+  Max, Terra / High, or DeepSeek / High implementer executes the complete specification,
+  the root verifies, and a fresh read-only Sol / High reviewer inspects the accumulated diff.
   On `fix-first`, the selected implementer handles the correction, the root
   re-verifies, and a new fresh reviewer inspects the result.
 
@@ -123,6 +125,33 @@ ROLE
 Act as Sol Advisor's default routine implementation worker. Execute the supplied
 specification within the settled architecture, preserve every stated interface and
 constraint, and surface ambiguity instead of redesigning the architecture.
+
+<paste and complete the Shared implementation contract>
+~~~
+
+## DeepSeek V4 Flash / High - capability-gated implementation lane
+
+Read [deepseek-native-lane.md](deepseek-native-lane.md) before selecting this role.
+Use it only when a declared delegate or full route selects DeepSeek and public runtime
+metadata verifies the exact role, model, and effort. An explicit DeepSeek request fails
+closed when that evidence is missing or inconsistent. An automatic pre-work routing
+failure may be reported before selecting Terra under the DeepSeek contract.
+
+Spawn exactly:
+
+~~~text
+agent_type: sol_advisor_deepseek_implementer
+fork_turns: none
+~~~
+
+The installed role pins `deepseek/deepseek-v4-flash` at high reasoning. Do not attach
+per-spawn model or reasoning fields. Prompt:
+
+~~~text
+ROLE
+Act as Sol Advisor's capability-gated DeepSeek implementation worker. Resolve the
+supplied specification within the settled architecture, preserve every stated
+interface and constraint, and surface ambiguity instead of redesigning the architecture.
 
 <paste and complete the Shared implementation contract>
 ~~~
