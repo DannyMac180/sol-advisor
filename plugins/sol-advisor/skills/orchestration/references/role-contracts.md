@@ -17,7 +17,10 @@ complete steps 3-4 before accepting the result:
    `sol_advisor_sol_reviewer`.
 3. Observe the selected role, model, and effort through public spawn/details metadata
    first, using the local runtime inspector only for omitted fields. Accept only
-   Terra / High for implementation and Sol / High for review.
+   Terra / high for implementation and Sol / high for review. Compare models exactly.
+   For user-facing effort labels, trim and case-normalize only `high` and `hög`:
+   English `High` and Swedish `Hög` are equivalent high labels. Runtime/config
+   evidence remains canonical lowercase `high`; no other label is accepted.
 4. For the reviewer, capture actual sandbox policy and permission profile types.
 
 A missing, stale, unsafe, conflicting, unavailable, inconsistent, or unobservable

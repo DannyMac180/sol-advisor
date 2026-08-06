@@ -109,7 +109,7 @@ jq empty "$manifest"
 [ "$(jq -r '.version' "$manifest")" = 0.4.0 ] || fail "manifest version is not 0.4.0"
 grep -Fq 'explicit opt-in' "$manifest" || fail "manifest does not describe explicit Luna opt-in"
 grep -Fqi 'GPT-5.6 Luna' "$manifest" || fail "manifest does not describe Luna routing"
-grep -Fq 'Codex app task tools' "$manifest" || fail "manifest does not describe app-task routing"
+grep -Fq 'tasks through list_projects' "$manifest" || fail "manifest does not describe app-task routing"
 grep -Fq 'fresh Sol' "$manifest" || fail "manifest does not preserve native fresh Sol review"
 pass "manifest JSON, version, and both-mode UI language"
 
@@ -262,6 +262,12 @@ grep -Fqi 'public native spawn/details metadata first' "$skill" || fail "skill l
 grep -Fqi 'parent captures and verifies exact before-and-after' "$contracts" || fail "contracts lack behavioral read-only state check"
 grep -Fq 'luna-task-lane.md' "$skill" || fail "skill does not link the Luna task contract"
 grep -Fq 'luna-task-lane.md' "$contracts" || fail "role contracts do not link the Luna task contract"
+for document in "$skill" "$contracts" "$readme"; do
+  grep -Fq '`High` and Swedish `Hög`' "$document" || fail "$document omits High/Hög display equivalence"
+  grep -Fq 'equivalent high labels' "$document" || fail "$document does not define High/Hög equivalence"
+  grep -Fq 'canonical lowercase `high`' "$document" || fail "$document does not preserve canonical machine effort"
+done
+pass "High/Hög display-label equivalence and canonical machine effort"
 
 for tool in list_projects list_threads create_thread wait_threads read_thread send_message_to_thread; do
   for document in "$skill" "$contracts" "$luna_contract" "$readme"; do

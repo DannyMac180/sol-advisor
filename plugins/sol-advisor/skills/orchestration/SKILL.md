@@ -20,10 +20,14 @@ before any explicitly authorized Luna task creation.
 ## Confirm the primary session
 
 Run the primary Codex session on gpt-5.6-sol with high reasoning. Verify the current
-model and effort when runtime metadata exposes them. If either differs, tell the user
-to select Sol / High and stop before delegation. If runtime metadata does not expose
-them, ask the user to confirm Sol / High and stop until confirmed. A skill cannot
-change the primary model itself; never assume or claim this prerequisite is satisfied.
+model and effort when runtime metadata exposes them. Compare the model exactly. For
+user-facing effort labels, trim and case-normalize only `high` and `hög`: English
+`High` and Swedish `Hög` are equivalent high labels. Machine-readable/config evidence
+remains canonical lowercase `high`. If either semantic value differs, tell the user to
+select Sol / High (or Sol / Hög) and stop before delegation. If runtime metadata does
+not expose them, ask the user to confirm Sol / High or Sol / Hög and stop until
+confirmed. A skill cannot change the primary model itself; never assume or claim this
+prerequisite is satisfied.
 
 ## Choose a lane
 
@@ -91,9 +95,11 @@ preflight in its contract:
    ~~~
 
    The helper's allowlisted output is the authoritative local fallback for omitted
-   model and effort. If public and local values both exist, they must agree. Accepted
-   values are Terra / high for implementation and Sol / high for review. Missing,
-   inconsistent, unavailable, or unobservable routing stops that lane.
+   model and effort. If public and local values both exist, they must agree after the
+   same effort-label normalization above; local machine evidence remains `high`.
+   Accepted values are exact Terra / high for implementation and Sol / high for
+   review, with public `High` or `Hög` accepted only as the equivalent high display
+   label. Missing, inconsistent, unavailable, or unobservable routing stops that lane.
 
 4. For every Sol review, capture the observed sandbox policy type and permission
    profile type. The shipped reviewer requests read-only sandboxing, but the host may
