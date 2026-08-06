@@ -32,10 +32,10 @@ python plugins/sol-advisor/scripts/role-dashboard.py serve
 Open the printed `http://127.0.0.1:8765/` address yourself. The server binds only to
 the loopback interface and does not start a browser. It offers a dropdown of model
 identifiers stored in `config/models.json` plus a `Custom model…` field for any
-identifier your existing Codex/OpenCodex setup accepts—for example, an existing
-OpenCodex combo name or a direct model name. The dashboard validates only safe
-identifier syntax and known reasoning-effort values; it does not claim that a
-provider accepts the selected value.
+identifier your existing Codex/OpenCodex setup accepts—for example, a direct
+model name such as `gpt-5.6-sol` or an `openrouter/model-name` identifier. The
+dashboard validates only safe identifier syntax and known reasoning-effort
+values; it does not claim that a provider accepts the selected value.
 
 Saving has deliberately narrow scope:
 

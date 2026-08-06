@@ -30,9 +30,6 @@ MAX_REQUEST_BYTES = 64 * 1024
 MODEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@+\-~]{0,127}$")
 EFFORTS = ("minimal", "low", "medium", "high", "max")
 DEFAULT_MODELS = (
-    "combo/sol-advisor-luna",
-    "combo/sol-advisor-sol",
-    "combo/sol-advisor-terra",
     "codex-auto-review",
     "deepseek/deepseek-v4-flash",
     "deepseek/deepseek-v4-pro",
@@ -96,7 +93,7 @@ def normalize_model(value: Any, role_name: str) -> str:
     if value != value.strip() or not MODEL_PATTERN.fullmatch(value):
         raise ConfigError(
             f"{role_name}.model must be a model identifier with no whitespace or quotes "
-            "(for example: combo/my-role or provider/model-name)."
+            "(for example: provider/model-name or openrouter/model-name)."
         )
     return value
 

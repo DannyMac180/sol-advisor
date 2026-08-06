@@ -8,8 +8,7 @@ keep primary verification and acceptance in the current task.**
 > can assign any supported model identifier and reasoning effort independently to the
 > primary orchestrator, native implementer, fresh native reviewer, and explicit Luna
 > task role. It saves only files inside this plugin; it does not query, configure, or
-> alter OpenCodex. Existing OpenCodex combo names remain valid identifiers if you want
-> to use them.
+> alter OpenCodex.
 
 Sol Advisor is a Codex-native architect workflow for capability-routed software
 delivery. The primary session stays focused on requirements, architecture, specs, and
@@ -58,11 +57,11 @@ The dashboard lets you assign a model identifier and reasoning effort to:
 - `luna_task` — used by an explicitly authorized `create_thread` Luna task.
 
 The dashboard shows a dropdown of model identifiers stored in
-`plugins/sol-advisor/config/models.json` (seeded with the Sol Advisor combos
-plus the model identifiers found in the local OpenCodex catalog and Codex
-Router). Pick from the list or choose `Custom model…` to enter any identifier
-your existing setup accepts; saving a custom model adds it to the dropdown for
-next time. It never edits or depends on OpenCodex.
+`plugins/sol-advisor/config/models.json` (seeded with the model identifiers
+found in the local OpenCodex catalog and Codex Router). Pick from the list or
+choose `Custom model…` to enter any identifier your existing setup accepts;
+saving a custom model adds it to the dropdown for next time. It never edits or
+depends on OpenCodex.
 
 Saving updates only `plugins/sol-advisor/config/role-map.json`,
 `plugins/sol-advisor/config/models.json`, and the two plugin-local native

@@ -1,9 +1,6 @@
 {
   "schema_version": 1,
   "models": [
-    "combo/sol-advisor-luna",
-    "combo/sol-advisor-sol",
-    "combo/sol-advisor-terra",
     "codex-auto-review",
     "deepseek/deepseek-v4-flash",
     "deepseek/deepseek-v4-pro",

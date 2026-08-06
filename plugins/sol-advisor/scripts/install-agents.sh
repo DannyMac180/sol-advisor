@@ -313,10 +313,11 @@ luna_destination=$target_dir/$luna_file
 # git show HEAD:plugins/sol-advisor/agents/sol-advisor-terra-implementer.toml | shasum -a 256
 legacy_luna_sha256=fba1b42849d93737e83b094a2ab0b1611f87ac37db7438c8bbdf581f0813f8eb
 legacy_terra_sha256=4425a8c1f21ce8c6af93f96adc253bbc33ea301f1389b3fa8ce350be08584eca
-# Exact v0.5.0 fixed-combo templates. These are safe one-time upgrade inputs, not
-# a permission to replace a user-modified agent file.
-prior_terra_sha256=4bf5f7e45836fa4eeb227e1362adac5feaa4732e93b412f3dc1e0be032cab601
-prior_sol_sha256=ec4f70f04499417c5a58a2272a551f7f051e8192d01f743b71bc0d471c465fa8
+# Exact prior-state templates (current rendering without the dashboard header).
+# These are safe one-time upgrade inputs, not a permission to replace a
+# user-modified agent file.
+prior_terra_sha256=06c318e5e93f37452635906394e6ea69fb6a65ba9e6ad7172d37b444e0dc871d
+prior_sol_sha256=0333acf0ef562bcfebd06009ac09bd1dd8cbc04c4cf28e08e9e049bd8bf202d2
 
 for template in "$terra_template" "$sol_template"; do
   [ -f "$template" ] && [ ! -L "$template" ] ||
