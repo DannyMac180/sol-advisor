@@ -1,8 +1,8 @@
 # Sol Advisor
 
-**Sol runs the show. Choose the native Terra / High lane, or explicitly opt into
-user-visible Luna tasks; the primary Sol task owns verification and acceptance in
-both modes.**
+**Sol runs the show. Use capability-gated DeepSeek or reliable Terra for native
+implementation, then obtain a fresh Sol review, or explicitly opt into user-visible
+Luna tasks.**
 
 Sol Advisor is a Codex-native architect workflow for capability-routed software
 delivery. The primary session stays focused on requirements, architecture, specs, and
@@ -15,13 +15,14 @@ I write [**Attention Heads**](https://attentionheads.substack.com/?utm_source=gi
 
 | Mode | Worker | Routing | Primary ownership |
 |---|---|---|---|
-| Native subagent (default) | `sol_advisor_terra_implementer`, then `sol_advisor_sol_reviewer` | GPT-5.6 Terra / High, then fresh GPT-5.6 Sol / High | Architecture, parent verification, and acceptance after the fresh native review |
+| Native subagent (default) | `sol_advisor_deepseek_implementer` or `sol_advisor_terra_implementer`, then `sol_advisor_sol_reviewer` | DeepSeek V4 Flash / High when its routed capability is verified, otherwise GPT-5.6 Terra / High; then fresh GPT-5.6 Sol / High | Architecture, implementation selection, reported pre-work fallback, parent verification, and acceptance after the fresh native review |
 | Luna task (explicit opt-in) | User-visible Codex task created with app task tools | GPT-5.6 Luna / Max | Decomposition, task monitoring, actual diff review, corrections, PR authorization, dependent-stack ordering, and final acceptance |
 
-The primary session is GPT-5.6 Sol / High in either mode. The native lane remains
-available and unchanged: it uses the separately installed Terra role and requires a
-fresh Sol reviewer. The Luna lane is outside native subagent V2, does not use a Luna
-custom-agent TOML, and never activates merely because this skill is installed.
+The primary session is GPT-5.6 Sol / High in either mode. Native mode installs
+DeepSeek, Terra, and fresh Sol roles separately. DeepSeek is capability-gated:
+installation alone does not prove that `deepseek/deepseek-v4-flash` is routable. The
+Luna lane is outside native subagent V2, does not use a Luna custom-agent TOML, and
+never activates merely because this skill is installed.
 
 In the native lane, the final review is context-independent, not model-family-
 independent: Sol reviews Sol's orchestration with a fresh context. In the Luna lane,
@@ -39,6 +40,8 @@ Additional native-mode requirements:
 
 - Native subagents and custom-agent support enabled.
 - Access to GPT-5.6 Terra / High.
+- To use the DeepSeek lane, a routed `deepseek/deepseek-v4-flash` model, such as an
+  active OpenCodex route. Terra remains available when that optional route is absent.
 - jq, which the native companion-install lookup uses to locate the installed plugin
   package.
 
@@ -93,8 +96,8 @@ feature.”
 
 ## Check and update native mode
 
-Run this check whenever the native Terra / High route must be trusted. Luna-only users
-can skip this companion check:
+Run this check whenever a native route must be trusted. Luna-only users can skip this
+companion check:
 
 ~~~sh
 plugin_dir="$(codex plugin list --json | jq -r '.installed[] | select(.pluginId == "sol-advisor@sol-advisor") | .source.path')"
@@ -114,22 +117,26 @@ sh "$plugin_dir/scripts/install-agents.sh"
 sh "$plugin_dir/scripts/install-agents.sh" --check
 ~~~
 
-Version 0.4.0 retains the historical byte-exact v0.2.0 migration for
+Version 0.5.0 retains the historical byte-exact v0.2.0 migration for
 `sol-advisor-luna-implementer.toml` and `sol-advisor-terra-implementer.toml` files.
 Normal installer mode replaces the exact legacy Terra file with the current Terra /
 High template, removes the exact legacy Luna file, and refuses modified, nonregular,
 or symlinked destinations without partial agent-file mutation. `--check` is
-non-mutating and fails until both current role files match exactly and Luna is absent.
+non-mutating and fails until all three current role files match exactly and Luna is
+absent.
 The native routing update was motivated by
 [Eric Provencher's X post](https://x.com/pvncher/status/2083300990350954981).
 
-The installer intentionally installs only the two native companion roles. The Luna
-task lane is an app-task workflow and must not add or restore a
-`sol-advisor-luna-implementer.toml` file.
+The installer intentionally installs the DeepSeek implementer, Terra implementer, and
+Sol reviewer companion roles. The Luna task lane is an app-task workflow and must not
+add or restore a `sol-advisor-luna-implementer.toml` file. Installing the DeepSeek role
+does not start OpenCodex or guarantee provider availability.
 
-For native mode, do not use a substitute agent as a shortcut. Start a fresh task after
-every successful install or update. Luna-only use does not require this installer or a
-native-agent refresh.
+For native mode, start a fresh task after every successful install or update. An
+explicit DeepSeek or Terra request never falls back. When no implementer is named, a
+clear DeepSeek routing failure before worker implementation begins may select Terra,
+but that fallback must be reported and must never be described as a DeepSeek run.
+Luna-only use does not require this installer or a native-agent refresh.
 
 ## Native runtime routing evidence
 
@@ -215,13 +222,14 @@ The complete packet, tool sequence, branch rules, and return schema are defined 
 ### Native subagent lane
 
 Unless the user explicitly opts into Luna, the native lane remains the default. It
-uses the installed Terra role for implementation and a fresh Sol reviewer after
-parent verification. It does not use the app-task tools for implementation.
+uses the installed DeepSeek or Terra role for implementation and a fresh Sol reviewer
+after parent verification. It does not use the app-task tools for implementation.
 
 Before delegation and acceptance, the skill requires all of the following:
 
 1. The installed role files pass the byte-for-byte companion check.
-2. The native spawn tool exposes both exact names in the table above.
+2. The native spawn tool exposes the Terra and Sol baseline roles. DeepSeek exposure
+   is checked separately and controls only whether that optional route can be selected.
 3. Public native spawn/details metadata identifies the selected role and, when exposed,
    its expected model and effort. If model or effort is omitted, the exact-rollout local
    inspector above must provide them instead.
@@ -230,9 +238,11 @@ Before delegation and acceptance, the skill requires all of the following:
 
 A missing, stale, conflicting, unavailable, inconsistent, or unobservable
 role/model/effort stops the affected native lane with an actionable error. There is no
-silent model, reasoning, or agent-type fallback, and native per-spawn calls do not
-override the role pins. The Luna lane has its own explicit tool-availability gate and
-also stops without fallback.
+silent model, reasoning, or agent-type fallback. The only automatic fallback is the
+reported selection of Terra after a clear DeepSeek routing failure before worker work
+begins and only when the user did not choose an implementer. Native per-spawn calls do
+not override the role pins. The Luna lane has its own explicit tool-availability gate
+and also stops without fallback.
 
 The Sol reviewer TOML requests read-only sandboxing, but the host permission profile
 may broaden that request. If the observed sandbox policy type is read-only, review can
@@ -303,9 +313,10 @@ uv run --no-project --with pyyaml python "$codex_skills/plugin-creator/scripts/v
 jq empty .agents/plugins/marketplace.json plugins/sol-advisor/.codex-plugin/plugin.json
 ~~~
 
-The verifier validates JSON and TOML, the two exact native role pins, clean/current/
+The verifier validates JSON and TOML, the three exact native role pins, clean/current/
 missing and idempotent installer behavior, exact-v0.2.0 migration, refusal/non-
-mutation gates, runtime-inspector safe fixtures, native and Luna lane contracts,
+mutation gates, runtime-inspector safe fixtures, native DeepSeek/Terra/Sol and Luna
+lane contracts,
 version/UI metadata, stale-claim guards, and shell syntax. The uv commands supply the
 validators' PyYAML dependency in a disposable environment. They do not install the
 marketplace or mutate Codex configuration.

@@ -1,7 +1,7 @@
 {
   "name": "sol-advisor",
-  "version": "0.4.0",
-  "description": "Codex-native architect workflow with a native Terra / High lane plus an explicit opt-in, user-visible Luna task lane, with primary-session verification and acceptance.",
+  "version": "0.5.0",
+  "description": "Codex-native architect workflow with capability-gated DeepSeek or Terra implementation, fresh Sol review, and an explicit opt-in user-visible Luna task lane.",
   "author": {"name": "Daniel McAteer", "url": "https://github.com/DannyMac180"},
   "homepage": "https://github.com/DannyMac180/sol-advisor#readme",
   "repository": "https://github.com/DannyMac180/sol-advisor",
@@ -10,12 +10,12 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Sol Advisor",
-    "shortDescription": "Orchestrate with Sol, use native Terra / High or opt-in Luna tasks, and verify the accepted diff.",
-    "longDescription": "Sol Advisor gives Codex two explicit delivery modes: GPT-5.6 Sol keeps architecture, decomposition, verification, and acceptance in the primary session; the native mode uses a separately installed GPT-5.6 Terra / High role and a fresh Sol reviewer, while the opt-in Luna mode creates user-visible GPT-5.6 Luna / Max tasks through list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread and keeps review, corrections, PR authorization, and dependent-stack ordering in the primary session.",
+    "shortDescription": "Orchestrate with Sol, use capability-gated DeepSeek or Terra, obtain fresh Sol review, or opt into Luna tasks.",
+    "longDescription": "Sol Advisor keeps architecture, decomposition, verification, and acceptance in a GPT-5.6 Sol / High primary session. Native mode installs a capability-gated deepseek/deepseek-v4-flash implementer, a reliable GPT-5.6 Terra / High implementer, and a fresh Sol reviewer; automatic selection may report a pre-work fallback from unavailable DeepSeek to Terra when the user did not choose a worker. The opt-in Luna mode creates user-visible GPT-5.6 Luna / Max tasks through Codex app task tools: list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread. It keeps review, corrections, PR authorization, and dependent-stack ordering in the primary session.",
     "developerName": "Daniel McAteer",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
     "websiteURL": "https://github.com/DannyMac180/sol-advisor",
-    "defaultPrompt": ["Use Sol Advisor's native lane to build this feature, verify it, and obtain the fresh Sol review before completion.", "Use the Luna task lane only when I explicitly authorize it; keep primary review and acceptance in this task."]
+    "defaultPrompt": ["Use Sol Advisor's native lane to build this feature with capability-gated DeepSeek or Terra, report any pre-work fallback, verify it, and obtain the fresh Sol review before completion.", "Use the Luna task lane only when I explicitly authorize it; keep primary review and acceptance in this task."]
   }
 }

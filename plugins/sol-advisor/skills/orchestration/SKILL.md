@@ -1,20 +1,22 @@
 ---
 name: orchestration
-description: "Codex-native architect and delegation workflow with a default GPT-5.6 Terra / High native subagent lane plus an explicit opt-in GPT-5.6 Luna / Max user-visible app-task lane; keep primary verification and acceptance, and require fresh Sol review for the native lane."
+description: "Codex-native architect workflow with capability-gated DeepSeek or Terra implementation, fresh Sol review, and an explicit opt-in Luna / Max user-visible task lane."
 ---
 
 # Sol Advisor Orchestration
 
 Act as the architect. Own the user's intent, architecture, decomposition, complete
 task specification, parent verification, and final acceptance. The default native
-lane delegates implementation to Terra / High and requires a fresh Sol verdict. The
-explicit Luna task lane creates user-visible Codex app tasks at GPT-5.6 Luna / Max;
+mode may use the capability-gated DeepSeek V4 Flash lane or the reliable Terra / High
+lane, and always requires a fresh Sol verdict. The explicit Luna task lane creates
+user-visible Codex app tasks at GPT-5.6 Luna / Max;
 the primary task monitors, reviews, corrects, authorizes PR creation, and orders
 dependent stacks. These lanes are distinct: the Luna lane is outside native subagent
 V2, never uses a Luna custom-agent TOML, and is never activated implicitly.
 
 Read [references/role-contracts.md](references/role-contracts.md) before the first
-native delegation in a session. Read the [Luna task-lane contract](references/luna-task-lane.md)
+native delegation in a session. Read the [DeepSeek native-lane contract](references/deepseek-native-lane.md)
+before selecting DeepSeek, and read the [Luna task-lane contract](references/luna-task-lane.md)
 before any explicitly authorized Luna task creation.
 
 ## Confirm the primary session
@@ -27,8 +29,11 @@ change the primary model itself; never assume or claim this prerequisite is sati
 
 ## Choose a lane
 
-The native Terra / High lane is the default. Activate the Luna task lane only when the
-user's current request explicitly says something like “Use the Luna task lane.” A
+Native mode is the default. If the user explicitly names Terra or DeepSeek, honor that
+choice. If no implementer is named, DeepSeek may be preferred only under the
+capability and pre-work fallback rules in its contract; otherwise use Terra. Activate
+the Luna task lane only when the user's current request explicitly says something like
+“Use the Luna task lane.” A
 skill activation, ordinary implementation request, or earlier conversation does not
 authorize creating a new user-owned task. If the required Luna model, Max reasoning,
 or app task tool is unavailable, stop without fallback to native delegation or another
@@ -44,7 +49,7 @@ corrections, git/PR boundary, and dependent-stack ordering.
 
 ## Preflight the native companion custom agents
 
-The two role files are user-owned native custom-agent TOML files. Installing or
+The three role files are user-owned native custom-agent TOML files. Installing or
 updating the plugin does not automatically register them. Install them separately and
 start a fresh Codex task so native discovery sees the current profiles.
 
@@ -61,14 +66,14 @@ preflight in its contract:
    sh "$installer" --check
    ~~~
 
-   It must exit zero. This proves Terra and Sol match the shipped templates exactly
-   and the retired Luna companion file is absent. If the check reports a missing,
+   It must exit zero. This proves Terra, DeepSeek, and Sol match the shipped templates
+   exactly and the retired Luna companion file is absent. If the check reports a missing,
    stale, unsafe, or conflicting file, stop the affected lane. Give the user the
    installer path and reported destination. Never work around failure with another
    agent, model, or effort.
 
-2. Inspect the native spawn tool's available `agent_type` entries. Both exact names
-   must be exposed:
+2. Inspect the native spawn tool's available `agent_type` entries. These two baseline
+   names must be exposed:
 
    - `sol_advisor_terra_implementer`
    - `sol_advisor_sol_reviewer`
@@ -76,6 +81,10 @@ preflight in its contract:
    If either is missing, tell the user to install/check the companion files, start a
    fresh task, and update Codex if the name remains unavailable. Do not substitute a
    built-in or similarly named role.
+
+   Separately record whether `sol_advisor_deepseek_implementer` is exposed. Its absence
+   makes DeepSeek unavailable but does not block Terra. Use Terra for an automatic
+   native selection, or stop if the user explicitly required DeepSeek.
 
 3. Treat exact templates plus observed runtime routing as an acceptance gate. Inspect
    public native spawn/details metadata first. It must identify the selected custom
@@ -92,8 +101,10 @@ preflight in its contract:
 
    The helper's allowlisted output is the authoritative local fallback for omitted
    model and effort. If public and local values both exist, they must agree. Accepted
-   values are Terra / high for implementation and Sol / high for review. Missing,
-   inconsistent, unavailable, or unobservable routing stops that lane.
+   values are Terra / high or `deepseek/deepseek-v4-flash` / high for implementation
+   and Sol / high for review. Missing, inconsistent, unavailable, or unobservable
+   routing stops that lane, except for the DeepSeek contract's narrow, reported,
+   pre-work automatic-selection fallback.
 
 4. For every Sol review, capture the observed sandbox policy type and permission
    profile type. The shipped reviewer requests read-only sandboxing, but the host may
@@ -119,23 +130,32 @@ is wrong, correct the specification and delegate the fix. If the Luna result is 
 send a precise correction back to the same task. Do not silently repair a failed child
 patch or create a replacement task merely to avoid an unresolved correction.
 
-## Route native implementation through Terra / High
+## Route native implementation through DeepSeek or Terra
 
-Use the same role for routine features, mechanical edits, difficult debugging,
-security-sensitive work, non-trivial algorithms, and broad refactors. There is no
-second native implementation or fallback lane. This section applies only when the
-user has not explicitly chosen the Luna task lane.
+This section applies only when the user has not explicitly chosen the Luna task lane.
+Honor an explicit Terra or DeepSeek choice. Without an explicit choice, prefer
+DeepSeek only under [its capability and fallback contract](references/deepseek-native-lane.md);
+otherwise use Terra. A DeepSeek automatic-selection fallback is allowed only after a
+clear routing failure before worker implementation begins, must be reported, and must
+never be described as a DeepSeek run.
 
-Spawn exactly:
+Spawn DeepSeek exactly:
+
+~~~text
+agent_type: sol_advisor_deepseek_implementer
+fork_turns: none
+~~~
+
+Spawn Terra exactly:
 
 ~~~text
 agent_type: sol_advisor_terra_implementer
 fork_turns: none
 ~~~
 
-The installed role pins GPT-5.6 Terra at high reasoning. Omit per-spawn model and
-reasoning fields. Confirm role, model, and effort using the public-details-first
-procedure before accepting work.
+The installed roles pin `deepseek/deepseek-v4-flash` or GPT-5.6 Terra at high
+reasoning. Omit per-spawn model and reasoning fields. Confirm role, model, and effort
+using the public-details-first procedure before accepting work.
 
 Routing rules:
 
@@ -145,7 +165,8 @@ Routing rules:
 - Run independent non-overlapping work concurrently only when useful. Keep shared-file
   edits and dependency chains serial.
 - Give a failed lane a corrected specification; never repeat an unchanged prompt.
-- Never silently substitute a role, model, or reasoning level.
+- Never silently substitute a role, model, or reasoning level. The only permitted
+  automatic substitution is the DeepSeek contract's reported pre-work Terra fallback.
 
 ## Route the explicit Luna task lane through Codex app tools
 
@@ -193,8 +214,9 @@ Treat worker reports as claims. Before acceptance:
 2. Confirm only in-scope files changed.
 3. Rerun the specification's verification commands in the primary session.
 4. Compare the evidence with the objective, interfaces, and constraints.
-5. For the native lane, delegate corrections through Terra; for the Luna lane, send
-   corrections back to the same task and re-review its updated evidence.
+5. For the native lane, delegate corrections through the same verified implementer;
+   for the Luna lane, send corrections back to the same task and re-review its updated
+   evidence.
 
 ## Consult fresh Sol at native commitment boundaries
 
