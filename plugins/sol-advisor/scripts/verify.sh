@@ -49,11 +49,19 @@ snapshot_files() {
     if [ -L "$path" ]; then
       printf 'L %s -> %s\n' "$(basename "$path")" "$(readlink "$path")"
     elif [ -f "$path" ]; then
-      shasum -a 256 "$path"
+      printf '%s  %s\n' "$(sha256_of "$path")" "$path"
     else
       printf 'O %s\n' "$(basename "$path")"
     fi
   done
+}
+
+sha256_of() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" 2>/dev/null | awk 'NF >= 1 && length($1) == 64 { print $1; exit }'
+  else
+    sha256sum "$1" 2>/dev/null | awk 'NF >= 1 && length($1) == 64 { print $1; exit }'
+  fi
 }
 
 write_legacy_roles() {
@@ -97,8 +105,8 @@ reasoning level; this installed custom-agent profile is the required routine lan
 """
 LEGACY_LUNA
   cp "$templates/$sol_file" "$target/$sol_file"
-  [ "$(shasum -a 256 "$target/$terra_file" | awk '{print $1}')" = "$legacy_terra_sha256" ] || fail "legacy Terra fixture digest drifted"
-  [ "$(shasum -a 256 "$target/$luna_file" | awk '{print $1}')" = "$legacy_luna_sha256" ] || fail "legacy Luna fixture digest drifted"
+  [ "$(sha256_of "$target/$terra_file")" = "$legacy_terra_sha256" ] || fail "legacy Terra fixture digest drifted"
+  [ "$(sha256_of "$target/$luna_file")" = "$legacy_luna_sha256" ] || fail "legacy Luna fixture digest drifted"
 }
 
 for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contracts" "$luna_contract" "$readme" "$ui"; do
@@ -106,14 +114,19 @@ for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contrac
 done
 
 jq empty "$manifest"
-[ "$(jq -r '.version' "$manifest")" = 0.4.0 ] || fail "manifest version is not 0.4.0"
+[ "$(jq -r '.version' "$manifest")" = 0.5.0 ] || fail "manifest version is not 0.5.0"
 grep -Fq 'explicit opt-in' "$manifest" || fail "manifest does not describe explicit Luna opt-in"
-grep -Fqi 'GPT-5.6 Luna' "$manifest" || fail "manifest does not describe Luna routing"
+grep -Fq 'combo/sol-advisor-luna' "$manifest" || fail "manifest does not describe Luna routing"
 grep -Fq 'Codex app task tools' "$manifest" || fail "manifest does not describe app-task routing"
 grep -Fq 'fresh Sol' "$manifest" || fail "manifest does not preserve native fresh Sol review"
 pass "manifest JSON, version, and both-mode UI language"
 
-python3 - "$templates" <<'PY'
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON=python3
+else
+  PYTHON=python
+fi
+"$PYTHON" - "$templates" <<'PY'
 from pathlib import Path
 import sys, tomllib
 
@@ -121,12 +134,12 @@ root = Path(sys.argv[1])
 expected = {
     "sol-advisor-terra-implementer.toml": {
         "name": "sol_advisor_terra_implementer",
-        "model": "gpt-5.6-terra",
+        "model": "combo/sol-advisor-terra",
         "model_reasoning_effort": "high",
     },
     "sol-advisor-sol-reviewer.toml": {
         "name": "sol_advisor_sol_reviewer",
-        "model": "gpt-5.6-sol",
+        "model": "combo/sol-advisor-sol",
         "model_reasoning_effort": "high",
         "sandbox_mode": "read-only",
     },
@@ -234,12 +247,12 @@ runtime_rollout=$runtime_day/rollout-2026-08-02T00-00-00-$runtime_id.jsonl
 printf '%s\n' \
   '{"type":"response_item","payload":{"prompt":"DO_NOT_LEAK_PROMPT"}}' \
   "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$runtime_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"agent_role\":\"sol_advisor_terra_implementer\",\"agent_path\":\"/root/fixture\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
-  '{"type":"turn_context","payload":{"model":"gpt-5.6-terra","effort":"high","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
+  '{"type":"turn_context","payload":{"model":"combo/sol-advisor-terra","effort":"high","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
   > "$runtime_rollout"
 runtime_output=$(sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$runtime_id")
 printf '%s\n' "$runtime_output" | jq -e --arg id "$runtime_id" '
   .thread_id == $id and .agent_role == "sol_advisor_terra_implementer"
-  and .model == "gpt-5.6-terra" and .effort == "high"
+  and .model == "combo/sol-advisor-terra" and .effort == "high"
   and .sandbox_policy_type == "danger-full-access"
   and .permission_profile_type == "disabled"
 ' >/dev/null || fail "runtime inspector returned wrong Terra/High evidence"
@@ -258,8 +271,8 @@ for document in "$skill" "$contracts"; do
 done
 grep -Fq '../../scripts/install-agents.sh' "$skill" || fail "skill does not resolve installer relatively"
 grep -Fq '../../scripts/inspect-agent-runtime.sh' "$skill" || fail "skill does not resolve inspector relatively"
-grep -Fqi 'public native spawn/details metadata first' "$skill" || fail "skill lacks public-details-first evidence rule"
-grep -Fqi 'parent captures and verifies exact before-and-after' "$contracts" || fail "contracts lack behavioral read-only state check"
+grep -qi 'public native spawn/details metadata first' "$skill" || fail "skill lacks public-details-first evidence rule"
+grep -qi 'parent captures and verifies exact before-and-after' "$contracts" || fail "contracts lack behavioral read-only state check"
 grep -Fq 'luna-task-lane.md' "$skill" || fail "skill does not link the Luna task contract"
 grep -Fq 'luna-task-lane.md' "$contracts" || fail "role contracts do not link the Luna task contract"
 
@@ -268,7 +281,7 @@ for tool in list_projects list_threads create_thread wait_threads read_thread se
     grep -Fq "$tool" "$document" || fail "$document omits Luna app tool: $tool"
   done
 done
-grep -Fq 'gpt-5.6-luna' "$skill" || fail "skill omits Luna model"
+grep -Fq 'combo/sol-advisor-luna' "$skill" || fail "skill omits Luna combo model"
 grep -Fq 'thinking` to `max' "$skill" || fail "skill omits Luna Max routing"
 grep -Fq 'isGitRepository' "$luna_contract" || fail "Luna contract omits Git-project check"
 grep -Fq 'isolated worktree environment' "$luna_contract" || fail "Luna contract omits Git worktree default"
@@ -302,7 +315,7 @@ grep -Fq 'Luna task (explicit opt-in)' "$readme" || fail "README omits the Luna 
 grep -Fq 'Use the Luna task lane' "$readme" || fail "README omits explicit Luna authorization"
 grep -Fq 'native lane remains' "$readme" || fail "README does not preserve the native lane"
 grep -Fq 'does not use a Luna' "$readme" || fail "README permits a Luna companion TOML"
-grep -Fq 'user-visible GPT-5.6 Luna / Max tasks' "$manifest" || fail "manifest UI omits user-visible Luna tasks"
+grep -Fq 'user-visible Luna tasks' "$manifest" || fail "manifest UI omits user-visible Luna tasks"
 grep -Fq 'list_threads' "$manifest" || fail "manifest UI omits list_threads"
 grep -Fq 'list_threads' "$ui" || fail "skill UI omits list_threads"
 grep -Fq 'Requirements common to both modes' "$readme" || fail "README omits common requirements"

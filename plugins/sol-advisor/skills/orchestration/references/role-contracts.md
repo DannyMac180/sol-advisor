@@ -17,7 +17,8 @@ complete steps 3-4 before accepting the result:
    `sol_advisor_sol_reviewer`.
 3. Observe the selected role, model, and effort through public spawn/details metadata
    first, using the local runtime inspector only for omitted fields. Accept only
-   Terra / High for implementation and Sol / High for review.
+   `combo/sol-advisor-terra` / High for implementation and `combo/sol-advisor-sol` / High
+   for review.
 4. For the reviewer, capture actual sandbox policy and permission profile types.
 
 A missing, stale, unsafe, conflicting, unavailable, inconsistent, or unobservable
@@ -72,12 +73,12 @@ Use this contract only after the user's current request explicitly authorizes th
 task lane. It is outside native subagent V2: use `list_projects`, `list_threads`,
 `create_thread`, `wait_threads`, `read_thread`, and `send_message_to_thread` as needed;
 never use `spawn_agent` for the child and never require a Luna companion TOML. If the required
-app tools, GPT-5.6 Luna, or Max reasoning are unavailable, stop without fallback.
+app tools, the Luna combo, or Max reasoning are unavailable, stop without fallback.
 
 Call `list_projects` first and choose the project from its returned `projectId` and
 `isGitRepository`. Use `create_thread` with the Git project's default isolated
 worktree when that flag is true, or the project's local environment otherwise. Set
-`model` to `gpt-5.6-luna` and `thinking` to `max`. A ready creation must provide a
+`model` to `combo/sol-advisor-luna` and `thinking` to `max`. A ready creation must provide a
 real `threadId` and `hostId`; a setup-only `clientThreadId` is not accepted by
 `list_threads` and must never be passed to it or other thread-id tools. Call
 `list_threads` without that client ID and correlate the newly created user-visible task
@@ -115,9 +116,10 @@ agent_type: sol_advisor_terra_implementer
 fork_turns: none
 ~~~
 
-The installed role pins GPT-5.6 Terra at high reasoning. Do not attach per-spawn model
-or reasoning fields. Require public-details-first runtime observation of the exact
-role and pin before accepting its report.
+The installed role pins the Terra combo (`combo/sol-advisor-terra`) at high reasoning;
+the concrete upstream model is whatever OpenCodex routes from the dashboard. Do not
+attach per-spawn model or reasoning fields. Require public-details-first runtime
+observation of the exact role and pin before accepting its report.
 
 Prompt:
 
@@ -139,7 +141,8 @@ agent_type: sol_advisor_sol_reviewer
 fork_turns: none
 ~~~
 
-The installed role pins GPT-5.6 Sol at high reasoning and requests a read-only sandbox.
+The installed role pins the Sol combo (`combo/sol-advisor-sol`) at high reasoning and
+requests a read-only sandbox.
 Do not attach per-spawn model or reasoning fields. Observe the actual role, pin,
 sandbox policy, and permission profile before accepting its verdict.
 

@@ -1,14 +1,14 @@
 ---
 name: orchestration
-description: "Codex-native architect and delegation workflow with a default GPT-5.6 Terra / High native subagent lane plus an explicit opt-in GPT-5.6 Luna / Max user-visible app-task lane; keep primary verification and acceptance, and require fresh Sol review for the native lane."
+description: "Codex-native architect and delegation workflow with a default combo-routed Terra / High native subagent lane plus an explicit opt-in combo-routed Luna / Max user-visible app-task lane; keep primary verification and acceptance, and require fresh Sol review for the native lane."
 ---
 
 # Sol Advisor Orchestration
 
 Act as the architect. Own the user's intent, architecture, decomposition, complete
 task specification, parent verification, and final acceptance. The default native
-lane delegates implementation to Terra / High and requires a fresh Sol verdict. The
-explicit Luna task lane creates user-visible Codex app tasks at GPT-5.6 Luna / Max;
+lane delegates implementation to the Terra combo / High and requires a fresh Sol verdict. The
+explicit Luna task lane creates user-visible Codex app tasks at the Luna combo / Max;
 the primary task monitors, reviews, corrects, authorizes PR creation, and orders
 dependent stacks. These lanes are distinct: the Luna lane is outside native subagent
 V2, never uses a Luna custom-agent TOML, and is never activated implicitly.
@@ -19,15 +19,17 @@ before any explicitly authorized Luna task creation.
 
 ## Confirm the primary session
 
-Run the primary Codex session on gpt-5.6-sol with high reasoning. Verify the current
-model and effort when runtime metadata exposes them. If either differs, tell the user
-to select Sol / High and stop before delegation. If runtime metadata does not expose
-them, ask the user to confirm Sol / High and stop until confirmed. A skill cannot
+Run the primary Codex session on `combo/sol-advisor-sol` with high reasoning
+(OpenCodex resolves that combo to the concrete model you selected in its dashboard).
+Verify the current model and effort when runtime metadata exposes them. If either
+differs, tell the user to select the Sol combo / High and stop before delegation.
+If runtime metadata does not expose them, ask the user to confirm the Sol combo /
+High and stop until confirmed. A skill cannot
 change the primary model itself; never assume or claim this prerequisite is satisfied.
 
 ## Choose a lane
 
-The native Terra / High lane is the default. Activate the Luna task lane only when the
+The native Terra combo lane is the default. Activate the Luna task lane only when the
 user's current request explicitly says something like “Use the Luna task lane.” A
 skill activation, ordinary implementation request, or earlier conversation does not
 authorize creating a new user-owned task. If the required Luna model, Max reasoning,
@@ -92,8 +94,9 @@ preflight in its contract:
 
    The helper's allowlisted output is the authoritative local fallback for omitted
    model and effort. If public and local values both exist, they must agree. Accepted
-   values are Terra / high for implementation and Sol / high for review. Missing,
-   inconsistent, unavailable, or unobservable routing stops that lane.
+   values are `combo/sol-advisor-terra` / high for implementation and
+   `combo/sol-advisor-sol` / high for review. Missing, inconsistent, unavailable,
+   or unobservable routing stops that lane.
 
 4. For every Sol review, capture the observed sandbox policy type and permission
    profile type. The shipped reviewer requests read-only sandboxing, but the host may
@@ -133,8 +136,9 @@ agent_type: sol_advisor_terra_implementer
 fork_turns: none
 ~~~
 
-The installed role pins GPT-5.6 Terra at high reasoning. Omit per-spawn model and
-reasoning fields. Confirm role, model, and effort using the public-details-first
+The installed role pins the Terra combo (`combo/sol-advisor-terra`) at high reasoning;
+the concrete upstream model is whatever OpenCodex routes from the dashboard. Omit
+per-spawn model and reasoning fields. Confirm role, model, and effort using the public-details-first
 procedure before accepting work.
 
 Routing rules:
@@ -156,11 +160,11 @@ the app's default isolated worktree; for a non-Git project, use the project's lo
 environment. Do not assume an isolated worktree makes concurrent edits merge-safe.
 
 The child receives a complete packet because a new user-visible task does not inherit
-the parent's full context. Set `model` to `gpt-5.6-luna` and `thinking` to `max` in
+the parent's full context. Set `model` to `combo/sol-advisor-luna` and `thinking` to `max` in
 `create_thread`. Treat accepted creation routing plus the returned task identity as
 the routing evidence; report model/thinking metadata only when the app tool provides
-it. If Luna, Max, or any required app task tool is unavailable, stop without a model,
-agent, or native-lane fallback.
+it. If the Luna combo, Max thinking, or any required app task tool is unavailable,
+stop without a model, agent, or native-lane fallback.
 
 When creation is pending, a `clientThreadId` is only a setup handle. It is not accepted
 by `list_threads`; call `list_threads` without passing that client ID and correlate the
@@ -207,8 +211,9 @@ agent_type: sol_advisor_sol_reviewer
 fork_turns: none
 ~~~
 
-The role pins Sol / High and requests read-only isolation. Omit per-spawn model and
-reasoning fields. Observe actual routing, sandbox, and permission metadata. The
+The role pins the Sol combo (`combo/sol-advisor-sol`) / High and requests read-only
+isolation. Omit per-spawn model and reasoning fields. Observe actual routing, sandbox,
+and permission metadata. The
 primary session remains responsible for the decision. Do not route the Luna task lane
 through this native reviewer.
 

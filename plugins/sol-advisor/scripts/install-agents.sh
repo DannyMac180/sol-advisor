@@ -38,7 +38,11 @@ path_exists() {
 }
 
 sha256_file() {
-  shasum -a 256 "$1" 2>/dev/null | awk 'NF >= 1 && length($1) == 64 { print $1; exit }'
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" 2>/dev/null | awk 'NF >= 1 && length($1) == 64 { print $1; exit }'
+  else
+    sha256sum "$1" 2>/dev/null | awk 'NF >= 1 && length($1) == 64 { print $1; exit }'
+  fi
 }
 
 classify_current_or_legacy() {

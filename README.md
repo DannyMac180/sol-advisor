@@ -4,6 +4,13 @@
 user-visible Luna tasks; the primary Sol task owns verification and acceptance in
 both modes.**
 
+> **Custom build (v0.5.0):** this fork replaces the hard-coded GPT-5.6 role pins with
+> OpenCodex combos. The three roles are pinned to `combo/sol-advisor-sol`,
+> `combo/sol-advisor-terra`, and `combo/sol-advisor-luna`, and OpenCodex resolves each
+> combo to the concrete model you select in its dashboard (http://localhost:10100).
+> Switch models, add failover targets, or change weights there at any time — no plugin
+> edits, no reinstall. See the original upstream README below for the base workflow.
+
 Sol Advisor is a Codex-native architect workflow for capability-routed software
 delivery. The primary session stays focused on requirements, architecture, specs, and
 verification while either native Codex custom-agent threads or separate Codex app
@@ -15,10 +22,10 @@ I write [**Attention Heads**](https://attentionheads.substack.com/?utm_source=gi
 
 | Mode | Worker | Routing | Primary ownership |
 |---|---|---|---|
-| Native subagent (default) | `sol_advisor_terra_implementer`, then `sol_advisor_sol_reviewer` | GPT-5.6 Terra / High, then fresh GPT-5.6 Sol / High | Architecture, parent verification, and acceptance after the fresh native review |
-| Luna task (explicit opt-in) | User-visible Codex task created with app task tools | GPT-5.6 Luna / Max | Decomposition, task monitoring, actual diff review, corrections, PR authorization, dependent-stack ordering, and final acceptance |
+| Native subagent (default) | `sol_advisor_terra_implementer`, then `sol_advisor_sol_reviewer` | `combo/sol-advisor-terra` / High, then fresh `combo/sol-advisor-sol` / High | Architecture, parent verification, and acceptance after the fresh native review |
+| Luna task (explicit opt-in) | User-visible Codex task created with app task tools | `combo/sol-advisor-luna` / Max | Decomposition, task monitoring, actual diff review, corrections, PR authorization, dependent-stack ordering, and final acceptance |
 
-The primary session is GPT-5.6 Sol / High in either mode. The native lane remains
+The primary session is the Sol combo / High in either mode. The native lane remains
 available and unchanged: it uses the separately installed Terra role and requires a
 fresh Sol reviewer. The Luna lane is outside native subagent V2, does not use a Luna
 custom-agent TOML, and never activates merely because this skill is installed.
@@ -33,19 +40,20 @@ that lane through the native Sol reviewer.
 Requirements common to both modes:
 
 - A current Codex CLI or ChatGPT desktop app with plugins enabled.
-- Access to GPT-5.6 Sol / High for the primary task.
+- The OpenCodex proxy running, with a `sol-advisor-sol` combo (the primary task runs
+  on `combo/sol-advisor-sol` / High).
 
 Additional native-mode requirements:
 
 - Native subagents and custom-agent support enabled.
-- Access to GPT-5.6 Terra / High.
+- The `sol-advisor-terra` combo routed through OpenCodex.
 - jq, which the native companion-install lookup uses to locate the installed plugin
   package.
 
 Additional Luna task-mode requirements:
 
 - Explicit authorization in the user's current request.
-- Access to GPT-5.6 Luna / Max and the Codex app task tools (`list_projects`,
+- The `sol-advisor-luna` combo routed through OpenCodex and the Codex app task tools (`list_projects`,
   `list_threads`, `create_thread`, `wait_threads`, `read_thread`, and
   `send_message_to_thread`).
 

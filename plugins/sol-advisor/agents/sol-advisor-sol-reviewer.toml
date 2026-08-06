@@ -1,6 +1,6 @@
 name = "sol_advisor_sol_reviewer"
 description = "Sol Advisor's fresh, read-only final review lane for inspected diffs and evidence."
-model = "gpt-5.6-sol"
+model = "combo/sol-advisor-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 
