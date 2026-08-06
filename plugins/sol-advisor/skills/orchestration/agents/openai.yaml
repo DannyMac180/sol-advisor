@@ -1,4 +1,4 @@
 interface:
   display_name: "Sol Advisor Orchestration"
-  short_description: "Use combo-routed Terra or explicitly opt into Luna tasks, then verify and accept"
-  default_prompt: "Use $orchestration for the native Terra combo lane and fresh Sol review; use the user-visible Luna task lane only when I explicitly authorize it, then use list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread to monitor, review, correct, and accept the task yourself."
+  short_description: "Use dashboard-configured model roles or explicitly opt into Luna tasks, then verify and accept"
+  default_prompt: "Use $orchestration with the configured primary, native implementation, and fresh review roles; use the user-visible Luna task lane only when I explicitly authorize it, resolve the configured Luna role, then use list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread to monitor, review, correct, and accept the task yourself."

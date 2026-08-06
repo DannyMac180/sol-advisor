@@ -1,15 +1,15 @@
 # Sol Advisor
 
-**Sol runs the show. Choose the native Terra / High lane, or explicitly opt into
-user-visible Luna tasks; the primary Sol task owns verification and acceptance in
-both modes.**
+**Sol runs the show. Choose a model for each named role in the local dashboard, use
+the native implementation lane or explicitly opt into user-visible Luna tasks, and
+keep primary verification and acceptance in the current task.**
 
-> **Custom build (v0.5.0):** this fork replaces the hard-coded GPT-5.6 role pins with
-> OpenCodex combos. The three roles are pinned to `combo/sol-advisor-sol`,
-> `combo/sol-advisor-terra`, and `combo/sol-advisor-luna`, and OpenCodex resolves each
-> combo to the concrete model you select in its dashboard (http://localhost:10100).
-> Switch models, add failover targets, or change weights there at any time — no plugin
-> edits, no reinstall. See the original upstream README below for the base workflow.
+> **Custom build (v0.6.0):** this fork adds a plugin-local model-role dashboard. You
+> can assign any supported model identifier and reasoning effort independently to the
+> primary orchestrator, native implementer, fresh native reviewer, and explicit Luna
+> task role. It saves only files inside this plugin; it does not query, configure, or
+> alter OpenCodex. Existing OpenCodex combo names remain valid identifiers if you want
+> to use them.
 
 Sol Advisor is a Codex-native architect workflow for capability-routed software
 delivery. The primary session stays focused on requirements, architecture, specs, and
@@ -22,12 +22,12 @@ I write [**Attention Heads**](https://attentionheads.substack.com/?utm_source=gi
 
 | Mode | Worker | Routing | Primary ownership |
 |---|---|---|---|
-| Native subagent (default) | `sol_advisor_terra_implementer`, then `sol_advisor_sol_reviewer` | `combo/sol-advisor-terra` / High, then fresh `combo/sol-advisor-sol` / High | Architecture, parent verification, and acceptance after the fresh native review |
-| Luna task (explicit opt-in) | User-visible Codex task created with app task tools | `combo/sol-advisor-luna` / Max | Decomposition, task monitoring, actual diff review, corrections, PR authorization, dependent-stack ordering, and final acceptance |
+| Native subagent (default) | `sol_advisor_terra_implementer`, then `sol_advisor_sol_reviewer` | The saved `native_implementer` mapping, then the saved `native_reviewer` mapping | Architecture, parent verification, and acceptance after the fresh native review |
+| Luna task (explicit opt-in) | User-visible Codex task created with app task tools | The saved `luna_task` mapping | Decomposition, task monitoring, actual diff review, corrections, PR authorization, dependent-stack ordering, and final acceptance |
 
-The primary session is the Sol combo / High in either mode. The native lane remains
-available and unchanged: it uses the separately installed Terra role and requires a
-fresh Sol reviewer. The Luna lane is outside native subagent V2, does not use a Luna
+The primary session uses the saved `primary_orchestrator` mapping in either mode. The
+native lane remains available and uses separately installed native implementer and
+reviewer roles. The Luna lane is outside native subagent V2, does not use a Luna
 custom-agent TOML, and never activates merely because this skill is installed.
 
 In the native lane, the final review is context-independent, not model-family-
@@ -35,27 +35,79 @@ independent: Sol reviews Sol's orchestration with a fresh context. In the Luna l
 the primary Sol task itself reviews and accepts the Luna task's work; it does not route
 that lane through the native Sol reviewer.
 
+## Configure model roles locally
+
+The role dashboard is part of this plugin checkout. It is intentionally local-only:
+it binds to `127.0.0.1`, stores the role map and generated templates only under
+`plugins/sol-advisor`, and does not launch a browser, inspect OpenCodex, query running
+processes, or change Codex configuration.
+
+From the repository root, start it and open the printed URL yourself:
+
+~~~sh
+python plugins/sol-advisor/scripts/role-dashboard.py serve
+~~~
+
+The dashboard lets you assign a model identifier and reasoning effort to:
+
+- `primary_orchestrator` — select this mapping manually before you start the primary
+  Codex task.
+- `native_implementer` — used by the stable
+  `sol_advisor_terra_implementer` native agent type.
+- `native_reviewer` — used by the stable `sol_advisor_sol_reviewer` native agent type.
+- `luna_task` — used by an explicitly authorized `create_thread` Luna task.
+
+The dashboard shows a dropdown of model identifiers stored in
+`plugins/sol-advisor/config/models.json` (seeded with the Sol Advisor combos
+plus the model identifiers found in the local OpenCodex catalog and Codex
+Router). Pick from the list or choose `Custom model…` to enter any identifier
+your existing setup accepts; saving a custom model adds it to the dropdown for
+next time. It never edits or depends on OpenCodex.
+
+Saving updates only `plugins/sol-advisor/config/role-map.json`,
+`plugins/sol-advisor/config/models.json`, and the two plugin-local native
+template files. After changing a native role, explicitly activate the generated
+templates only when you are ready:
+
+~~~sh
+sh plugins/sol-advisor/scripts/install-agents.sh --sync
+sh plugins/sol-advisor/scripts/install-agents.sh --check
+~~~
+
+`--sync` refuses a manually modified, unknown, nonregular, or symlinked destination;
+it only replaces a missing, known historical, or intact dashboard-generated Sol Advisor
+role file. Start a **new Codex task** after it succeeds. The primary and Luna role
+assignments do not use this installer: select the primary mapping before the task, and
+the orchestration workflow reads the Luna mapping only after explicit user
+authorization for that lane.
+
+For a quick local inspection without starting the page:
+
+~~~sh
+python plugins/sol-advisor/scripts/role-dashboard.py status
+python plugins/sol-advisor/scripts/role-dashboard.py get luna_task --json
+~~~
+
 ## Install from GitHub
 
 Requirements common to both modes:
 
 - A current Codex CLI or ChatGPT desktop app with plugins enabled.
-- The OpenCodex proxy running, with a `sol-advisor-sol` combo (the primary task runs
-  on `combo/sol-advisor-sol` / High).
+- A valid local role map, with model identifiers accepted by your existing Codex/model
+  routing setup. The plugin does not configure that routing setup for you.
 
 Additional native-mode requirements:
 
 - Native subagents and custom-agent support enabled.
-- The `sol-advisor-terra` combo routed through OpenCodex.
 - jq, which the native companion-install lookup uses to locate the installed plugin
   package.
 
 Additional Luna task-mode requirements:
 
 - Explicit authorization in the user's current request.
-- The `sol-advisor-luna` combo routed through OpenCodex and the Codex app task tools (`list_projects`,
-  `list_threads`, `create_thread`, `wait_threads`, `read_thread`, and
-  `send_message_to_thread`).
+- The configured `luna_task` model/effort accepted by the Codex app task tools
+  (`list_projects`, `list_threads`, `create_thread`, `wait_threads`, `read_thread`,
+  and `send_message_to_thread`).
 
 Add the GitHub repository as a Codex marketplace, then install the plugin:
 
@@ -88,8 +140,8 @@ missing template and then verifies every installed copy byte-for-byte.
 
 For native mode, start a **new Codex task** after the check passes. Native agent types
 are discovered at task creation, so an existing task may not see the installed roles.
-Then select GPT-5.6 Sol with High reasoning for the primary session and ask for
-implementation work normally, or invoke the orchestration skill explicitly:
+Then select the saved `primary_orchestrator` model and effort for the primary session
+and ask for implementation work normally, or invoke the orchestration skill explicitly:
 
 ~~~text
 Use $sol-advisor:orchestration to build this feature, verify it, and obtain the final Sol review before reporting done.
@@ -101,8 +153,8 @@ feature.”
 
 ## Check and update native mode
 
-Run this check whenever the native Terra / High route must be trusted. Luna-only users
-can skip this companion check:
+Run this check whenever the configured native-role route must be trusted. Luna-only
+users can skip this companion check:
 
 ~~~sh
 plugin_dir="$(codex plugin list --json | jq -r '.installed[] | select(.pluginId == "sol-advisor@sol-advisor") | .source.path')"
@@ -110,25 +162,25 @@ test -d "$plugin_dir"
 sh "$plugin_dir/scripts/install-agents.sh" --check
 ~~~
 
-To update the marketplace plugin and, for native mode, migrate the exact recognized
-v0.2.0 companion files:
+To update the marketplace plugin and, for native mode, migrate exact recognized
+historical companion files or explicitly sync a dashboard-generated role change:
 
 ~~~sh
 codex plugin marketplace upgrade sol-advisor
 codex plugin add sol-advisor@sol-advisor
 plugin_dir="$(codex plugin list --json | jq -r '.installed[] | select(.pluginId == "sol-advisor@sol-advisor") | .source.path')"
 test -d "$plugin_dir"
-sh "$plugin_dir/scripts/install-agents.sh"
+sh "$plugin_dir/scripts/install-agents.sh" --sync
 sh "$plugin_dir/scripts/install-agents.sh" --check
 ~~~
 
-Version 0.4.0 retains the historical byte-exact v0.2.0 migration for
+The installer retains the historical byte-exact v0.2.0 migration for
 `sol-advisor-luna-implementer.toml` and `sol-advisor-terra-implementer.toml` files.
-Normal installer mode replaces the exact legacy Terra file with the current Terra /
-High template, removes the exact legacy Luna file, and refuses modified, nonregular,
-or symlinked destinations without partial agent-file mutation. `--check` is
-non-mutating and fails until both current role files match exactly and Luna is absent.
-The native routing update was motivated by
+Normal installer mode handles a first install or that exact legacy migration. `--sync`
+is required to update an intact dashboard-generated or exact v0.5.0 template and
+refuses modified, nonregular, or symlinked destinations without partial agent-file
+mutation. `--check` is non-mutating and fails until both current role files match the
+saved local role map and Luna is absent. The native routing update was motivated by
 [Eric Provencher's X post](https://x.com/pvncher/status/2083300990350954981).
 
 The installer intentionally installs only the two native companion roles. The Luna
@@ -143,9 +195,9 @@ native-agent refresh.
 
 Native spawn/details metadata is the primary source of routing evidence. It must show
 the selected custom agent type. When it also exposes model and effort, the orchestrator
-compares those values with the role pin. If Desktop omits model or effort and the local
-rollout is accessible, use the companion inspector as the authoritative read-only
-fallback for those omitted fields:
+compares those values with the current local role mapping. If Desktop omits model or
+effort and the local rollout is accessible, use the companion inspector as the
+authoritative read-only fallback for those omitted fields:
 
 ~~~sh
 plugin_dir="$(codex plugin list --json | jq -r '.installed[] | select(.pluginId == "sol-advisor@sol-advisor") | .source.path')"
@@ -168,9 +220,9 @@ exist, they must agree.
 
 ## How routing works
 
-The Sol orchestrator keeps architecture, decomposition, verification, and acceptance
-in the primary session. The native lane uses the five-part implementation spec and
-routes production through Terra / High. The Luna lane uses a complete task packet with
+The primary orchestrator keeps architecture, decomposition, verification, and
+acceptance in the primary session. The native lane uses the five-part implementation
+spec and the saved native implementer mapping. The Luna lane uses a complete task packet with
 objective, files and ownership, interfaces, constraints, starting state/base,
 verification, git/PR boundary, and a structured return. Read the full app-task
 contract in [the Luna task-lane reference](plugins/sol-advisor/skills/orchestration/references/luna-task-lane.md).
@@ -186,16 +238,16 @@ Use the Luna task lane for this feature.
 
 Skill activation, a general request to implement, or a previous authorization is not
 enough. If the user does not explicitly opt in, keep the native lane or ask for that
-authorization. The lane stops without fallback if GPT-5.6 Luna, Max reasoning, or any
-required app task tool is unavailable.
+authorization. The lane stops without fallback if its saved model, saved reasoning
+effort, or any required app task tool is unavailable.
 
 The primary task then:
 
 1. Calls `list_projects`, confirms the selected project, and checks `isGitRepository`.
    For a Git project, `create_thread` defaults to an isolated worktree; for a
    non-Git project it uses the project's local environment.
-2. Sends a complete task packet to `create_thread` with `model` set to
-   `gpt-5.6-luna` and `thinking` set to `max`.
+2. Resolves the saved `luna_task` mapping and sends a complete task packet to
+   `create_thread` with its `model` and `thinking` values.
 3. If creation returns only a `clientThreadId`, calls `list_threads` without passing
    that value—`list_threads` does not accept `clientThreadId`—and correlates the newly
    created user-visible task using trustworthy identity, project, time, path, and
@@ -223,8 +275,8 @@ The complete packet, tool sequence, branch rules, and return schema are defined 
 ### Native subagent lane
 
 Unless the user explicitly opts into Luna, the native lane remains the default. It
-uses the installed Terra role for implementation and a fresh Sol reviewer after
-parent verification. It does not use the app-task tools for implementation.
+uses the installed configured implementation role and a fresh configured reviewer
+after parent verification. It does not use the app-task tools for implementation.
 
 Before delegation and acceptance, the skill requires all of the following:
 
@@ -242,7 +294,7 @@ silent model, reasoning, or agent-type fallback, and native per-spawn calls do n
 override the role pins. The Luna lane has its own explicit tool-availability gate and
 also stops without fallback.
 
-The Sol reviewer TOML requests read-only sandboxing, but the host permission profile
+The reviewer TOML requests read-only sandboxing, but the host permission profile
 may broaden that request. If the observed sandbox policy type is read-only, review can
 proceed with enforced isolation. If the host broadens it, review can proceed only as
 behaviorally read-only when hard isolation is not required, the prompt forbids edits,
@@ -251,9 +303,9 @@ the broader sandbox and permission profile must be reported as residual risk. If
 isolation is required, the sandbox cannot be observed, or any mutation occurs, stop the
 review lane and do not claim enforced read-only isolation.
 
-The native orchestrator inspects every diff and reruns verification. A fresh Sol
+The native orchestrator inspects every diff and reruns verification. A fresh configured
 reviewer then returns ship, fix-first, or rethink; the native session cannot report
-completion until that reviewer returns ship. In the Luna lane, the primary Sol task
+completion until that reviewer returns ship. In the Luna lane, the primary task
 performs the review itself and does not launch a native subagent or a nested Codex CLI
 process for the child task. Sol Advisor does not globally reroute unrelated tasks.
 

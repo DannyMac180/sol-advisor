@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "models": [
+    "combo/sol-advisor-luna",
+    "combo/sol-advisor-sol",
+    "combo/sol-advisor-terra",
+    "codex-auto-review",
+    "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v4-pro",
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.5",
+    "gpt-5.6-luna",
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "openrouter/anthropic-claude-sonnet-5",
+    "openrouter/deepseek-deepseek-v4-flash-0731",
+    "openrouter/moonshotai-kimi-k3",
+    "openrouter/openai-gpt-5.6-luna",
+    "openrouter/openai-gpt-5.6-luna-pro",
+    "openrouter/openai-gpt-5.6-terra",
+    "openrouter/openai-gpt-5.6-terra-pro",
+    "openrouter/~deepseek/deepseek-v4-flash-latest"
+  ]
+}

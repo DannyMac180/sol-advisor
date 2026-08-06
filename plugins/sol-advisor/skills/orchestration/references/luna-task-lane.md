@@ -1,9 +1,10 @@
 # Luna task-lane contract
 
 This is the normative contract for Sol Advisor's explicit, user-visible Luna task
-lane. It is a Codex app-task workflow outside native subagent V2. The primary
-Sol combo (`combo/sol-advisor-sol`) / High task remains the architect, reviewer, correction owner, PR
-authority, and final acceptor.
+lane. It is a Codex app-task workflow outside native subagent V2. The configured
+`primary_orchestrator` role remains the architect, reviewer, correction owner, PR
+authority, and final acceptor. See [the model-role reference](model-roles.md) for the
+local mapping and activation boundaries.
 
 ## Scope and authorization
 
@@ -13,13 +14,13 @@ authority, and final acceptor.
 - A created task is user-visible and user-owned. The primary task must not imply that
   the child will inherit the parent's full history or receive an automatic callback.
 - This lane never uses native `spawn_agent`, a native custom-agent role, or a Luna
-  companion TOML. The existing native Terra / High -> fresh Sol / High lane remains
+  companion TOML. The configured native implementation -> fresh reviewer lane remains
   available and is not replaced by this contract.
-- Before creation, confirm that the app exposes `list_projects`, `list_threads`,
-  `create_thread`, `wait_threads`, `read_thread`, and `send_message_to_thread`, and
-  that the selected host accepts `combo/sol-advisor-luna` with `max` thinking. If any required
-  capability is unavailable, stop without fallback to another model, effort, agent, or
-  lane.
+- Before creation, resolve `luna_task` from the local role map, confirm that the app
+  exposes `list_projects`, `list_threads`, `create_thread`, `wait_threads`,
+  `read_thread`, and `send_message_to_thread`, and confirm that the selected host
+  accepts its configured model and effort. If any required capability is unavailable,
+  stop without fallback to another model, effort, agent, or lane.
 
 ## Routing evidence and tool sequence
 
@@ -29,8 +30,8 @@ authority, and final acceptor.
 2. Build the complete task packet below. Do not create a child with a partial prompt.
    The packet must state the exact ownership, starting base, verification, and git/PR
    boundary that the new task cannot infer from the primary task.
-3. Call `create_thread` with the selected project, the complete packet, `model` set to
-   `combo/sol-advisor-luna`, and `thinking` set to `max`. For a Git project, use the default
+3. Call `create_thread` with the selected project, the complete packet, `model` and
+   `thinking` set to the current `luna_task` mapping. For a Git project, use the default
    isolated worktree environment after `isGitRepository` confirms it is a repository.
    For a non-Git project, use the project's local environment. Do not use a working
    tree or an existing branch as the starting state unless the primary explicitly
@@ -95,8 +96,8 @@ INTERFACES
 
 CONSTRAINTS
 - <Repository conventions, safety boundaries, settled decisions, and excluded scope.>
-- This task uses the Luna combo (`combo/sol-advisor-luna`) at Max reasoning as
-  requested by the primary task.
+- This task uses the `luna_task` model and effort selected in the plugin-local role
+  map as requested by the primary task.
 - Do not use native subagent routing, a companion-agent TOML, or an unapproved model or
   effort as a substitute.
 

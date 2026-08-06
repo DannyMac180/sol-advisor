@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "roles": {
+    "primary_orchestrator": {
+      "model": "combo/sol-advisor-sol",
+      "effort": "high"
+    },
+    "native_implementer": {
+      "model": "combo/sol-advisor-terra",
+      "effort": "high"
+    },
+    "native_reviewer": {
+      "model": "combo/sol-advisor-sol",
+      "effort": "high"
+    },
+    "luna_task": {
+      "model": "combo/sol-advisor-luna",
+      "effort": "max"
+    }
+  }
+}
