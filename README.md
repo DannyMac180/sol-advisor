@@ -68,6 +68,19 @@ Saving updates only `plugins/sol-advisor/config/role-map.json`,
 template files. After changing a native role, explicitly activate the generated
 templates only when you are ready:
 
+To refresh the dropdown from your current local Codex/OpenCodex model sources
+(the OpenCodex proxy catalog, Codex Router model lists, and router-model agent
+pins), run the sync command from the repository root. It reads only model
+identifiers — never prompts, messages, tokens, or configuration secrets:
+
+~~~sh
+python plugins/sol-advisor/scripts/role-dashboard.py sync --dry-run
+python plugins/sol-advisor/scripts/role-dashboard.py sync
+~~~
+
+`sync` keeps any identifier currently assigned to a role and drops stale
+entries; `--dry-run` previews the change without writing.
+
 ~~~sh
 sh plugins/sol-advisor/scripts/install-agents.sh --sync
 sh plugins/sol-advisor/scripts/install-agents.sh --check

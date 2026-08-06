@@ -55,10 +55,20 @@ python plugins/sol-advisor/scripts/role-dashboard.py status
 # Read one assignment, including from an orchestration preflight.
 python plugins/sol-advisor/scripts/role-dashboard.py get luna_task --json
 
+# Refresh the dropdown list from local Codex/OpenCodex model sources.
+python plugins/sol-advisor/scripts/role-dashboard.py sync --dry-run
+python plugins/sol-advisor/scripts/role-dashboard.py sync
+
 # Regenerate the two plugin-local native templates after a direct role-map edit.
 python plugins/sol-advisor/scripts/role-dashboard.py apply
 python plugins/sol-advisor/scripts/role-dashboard.py check
 ~~~
+
+`sync` reads only model identifier lists from local Codex/OpenCodex files when
+they exist (OpenCodex proxy catalog, Codex Router model lists, and
+`router-model-*` agent pins), keeps identifiers currently assigned to roles,
+and drops stale entries. It never reads prompts, messages, tokens, or
+configuration secrets.
 
 ## Activate a native-role change deliberately
 

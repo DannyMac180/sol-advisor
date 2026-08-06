@@ -306,6 +306,61 @@ print("dashboard dropdown model list is valid")
 PY
 pass "dashboard dropdown model list"
 
+"$PYTHON" - "$role_dashboard" <<'PY'
+from pathlib import Path
+import importlib.util
+import json
+import os
+import sys
+import tempfile
+
+dashboard_path = Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("role_dashboard_sync", dashboard_path)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+
+scratch = Path(tempfile.mkdtemp(prefix="sol-advisor-sync."))
+module.MODELS_PATH = scratch / "models.json"
+module.AGENTS_DIR = scratch / "agents"
+home = scratch / "home"
+(home / ".codex" / "codex-router").mkdir(parents=True)
+(home / ".codex" / "agents").mkdir(parents=True)
+roles = {
+    "primary_orchestrator": {"model": "gpt-5.6-sol", "effort": "high"},
+    "native_implementer": {"model": "gpt-5.6-terra", "effort": "high"},
+    "native_reviewer": {"model": "gpt-5.6-sol", "effort": "high"},
+    "luna_task": {"model": "gpt-5.6-luna", "effort": "max"},
+}
+module.CONFIG_PATH = scratch / "role-map.json"
+module.save_config_and_templates({"schema_version": 1, "roles": roles})
+
+os.environ["HOME"] = str(home)
+(home / ".codex" / "opencodex-catalog.json").write_text(
+    json.dumps({"models": [{"slug": "fresh/model-new"}, {"slug": "gpt-5.6-sol"}]}),
+    encoding="utf-8",
+)
+(home / ".codex" / "agents" / "router-model-extra.toml").write_text(
+    'model = "deepseek/deepseek-v4-flash"\n', encoding="utf-8"
+)
+
+module.save_models(["gpt-5.6-sol"])
+if module.command_sync(dry_run=False) != 0:
+    raise SystemExit("sync failed")
+merged = module.load_models()
+if not {"fresh/model-new", "deepseek/deepseek-v4-flash", "gpt-5.6-sol"}.issubset(merged):
+    raise SystemExit(f"sync did not merge sources and active picks: {merged}")
+
+before = module.MODELS_PATH.read_text(encoding="utf-8")
+if module.command_sync(dry_run=True) != 0:
+    raise SystemExit("dry-run sync failed")
+after = module.MODELS_PATH.read_text(encoding="utf-8")
+if before != after:
+    raise SystemExit("dry-run sync wrote to models.json")
+print("sync merges local model sources, keeps active picks, dry-run is non-mutating")
+PY
+pass "dashboard sync merges local sources without mutation on dry run"
+
 grep -Fq "legacy_terra_sha256=$legacy_terra_sha256" "$installer" || fail "installer legacy Terra digest mismatch"
 grep -Fq "legacy_luna_sha256=$legacy_luna_sha256" "$installer" || fail "installer legacy Luna digest mismatch"
 pass "immutable v0.2.0 migration fingerprints"

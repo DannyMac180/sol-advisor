@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Manage Sol Advisor's plugin-local model-to-role configuration.
 
-This utility never connects to, starts, stops, or configures OpenCodex. It accepts
-model identifiers as text and writes only files inside this plugin directory.
+This utility never connects to, starts, stops, or configures OpenCodex. During an
+explicit `sync` it reads only model identifier lists from local Codex/OpenCodex
+files; it never reads prompts, messages, tokens, or configuration secrets. It
+writes only files inside this plugin directory.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ import os
 import re
 import sys
 import tempfile
+import tomllib
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -47,6 +50,12 @@ DEFAULT_MODELS = (
     "openrouter/openai-gpt-5.6-terra",
     "openrouter/openai-gpt-5.6-terra-pro",
     "openrouter/~deepseek/deepseek-v4-flash-latest",
+)
+LOCAL_MODEL_SOURCES = (
+    "~/.codex/opencodex-catalog.json",
+    "~/.codex/codex-router/user-models.json",
+    "~/.codex/codex-router/merged-models.json",
+    "~/.codex/codex-router/native-models.json",
 )
 ROLE_ORDER = (
     "primary_orchestrator",
@@ -180,6 +189,75 @@ def save_models(models: list[str]) -> None:
         )
         + "\n",
     )
+
+
+def discover_local_models() -> list[str]:
+    """Collect model identifiers from local Codex/OpenCodex files, when present."""
+
+    discovered: list[str] = []
+    for source in LOCAL_MODEL_SOURCES:
+        path = Path(source).expanduser()
+        if not path.is_file():
+            continue
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        items = raw.get("models", []) if isinstance(raw, dict) else []
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            slug = item.get("slug") or item.get("model")
+            if isinstance(slug, str) and slug and MODEL_PATTERN.fullmatch(slug):
+                discovered.append(slug)
+    for agent_toml in Path("~/.codex/agents").expanduser().glob("router-model-*.toml"):
+        try:
+            data = tomllib.loads(agent_toml.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+        model = data.get("model")
+        if isinstance(model, str) and model and MODEL_PATTERN.fullmatch(model):
+            discovered.append(model)
+    return list(dict.fromkeys(discovered))
+
+
+def synced_models(discovered: list[str], current: list[str], active: list[str]) -> list[str]:
+    """Union of discovered identifiers plus any identifiers actively assigned to roles."""
+
+    merged = list(dict.fromkeys([*discovered, *active]))
+    return sorted(merged)
+
+
+def command_sync(dry_run: bool) -> int:
+    try:
+        current = load_models()
+        active = [assignment["model"] for assignment in load_config()["roles"].values()]
+    except ConfigError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    discovered = discover_local_models()
+    merged = synced_models(discovered, current, active)
+    added = sorted(set(merged) - set(current))
+    removed = sorted(set(current) - set(merged))
+    if dry_run:
+        print(f"DRY RUN: {len(discovered)} identifiers discovered, {len(merged)} total "
+              f"(would add {len(added)}, remove {len(removed)}).")
+        for name in added:
+            print(f"  + {name}")
+        for name in removed:
+            print(f"  - {name}")
+        return 0
+    if added or removed or merged != current:
+        save_models(merged)
+    print(f"SYNCED: {len(discovered)} identifiers discovered, {len(merged)} total "
+          f"({len(added)} added, {len(removed)} removed).")
+    for name in added:
+        print(f"  + {name}")
+    for name in removed:
+        print(f"  - {name}")
+    return 0
 
 
 def toml_string(value: str) -> str:
@@ -323,7 +401,7 @@ def status_payload(config: dict[str, Any]) -> dict[str, Any]:
             ],
             "does_not_do": [
                 "query, start, stop, or configure OpenCodex",
-                "inspect other local processes or applications",
+                "read prompts, messages, tokens, or configuration secrets from other applications",
                 "install or overwrite Codex custom-agent files",
                 "change the model of an already-running Codex task",
             ],
@@ -747,6 +825,16 @@ def parse_arguments(argv: list[str]) -> argparse.Namespace:
     get.add_argument("role", choices=ROLE_ORDER, help="role whose model and effort to show")
     get.add_argument("--json", action="store_true", help="emit machine-readable role data")
 
+    sync = subcommands.add_parser(
+        "sync",
+        help="refresh the dropdown list from local Codex/OpenCodex model files",
+    )
+    sync.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print what would change without writing",
+    )
+
     subcommands.add_parser("apply", help="regenerate native templates inside this plugin only")
     subcommands.add_parser("check", help="fail unless native templates match the local role map")
     subcommands.add_parser("render", help="print the generated native templates without writing")
@@ -767,6 +855,8 @@ def main(argv: list[str] | None = None) -> int:
         return command_status(arguments.json)
     if arguments.command == "get":
         return command_get(arguments.role, arguments.json)
+    if arguments.command == "sync":
+        return command_sync(arguments.dry_run)
     if arguments.command == "apply":
         return command_apply()
     if arguments.command == "check":
