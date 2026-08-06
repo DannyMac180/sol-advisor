@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "roles": {
+    "primary_orchestrator": {
+      "model": "gpt-5.6-sol",
+      "effort": "high"
+    },
+    "native_implementer": {
+      "model": "gpt-5.6-terra",
+      "effort": "high"
+    },
+    "native_reviewer": {
+      "model": "gpt-5.6-sol",
+      "effort": "high"
+    },
+    "luna_task": {
+      "model": "gpt-5.6-luna",
+      "effort": "max"
+    }
+  }
+}

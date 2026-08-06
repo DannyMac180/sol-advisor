@@ -96,7 +96,8 @@ IFS= read -r rollout_file < "$matches_file" || fail "could not read the matched 
 
 # The jq program reads only the matched JSONL and constructs a new allowlisted object.
 # It rejects absent or conflicting required routing values instead of inferring them.
-if ! jq -ce -s --arg expected_thread_id "$thread_id" '
+if command -v jq >/dev/null 2>&1; then
+  if ! jq -ce -s --arg expected_thread_id "$thread_id" '
   def string_or_null:
     if type == "string" then . else null end;
 
@@ -148,9 +149,89 @@ if ! jq -ce -s --arg expected_thread_id "$thread_id" '
         sandbox_policy_type: $sandbox_types[0],
         permission_profile_type: $permission_types[0],
         cwd: $cwds[0]
-      }
+  }
     end
   end
 ' "$rollout_file" 2>/dev/null; then
-  fail "rollout is missing, ambiguous, invalid, or inconsistent required routing metadata."
+    fail "rollout is missing, ambiguous, invalid, or inconsistent required routing metadata."
+  fi
+else
+  if command -v python3 >/dev/null 2>&1; then
+    runtime_python=python3
+  else
+    runtime_python=python
+  fi
+  if ! "$runtime_python" - "$rollout_file" "$thread_id" <<'PY'
+import json
+import sys
+
+rollout_path, expected_thread_id = sys.argv[1:]
+
+def as_string_or_none(value):
+    return value if isinstance(value, str) else None
+
+def only(values, label):
+    if not values or any(value is None or value == "" for value in values):
+        raise ValueError(f"missing {label}")
+    distinct = set(values)
+    if len(distinct) != 1:
+        raise ValueError(f"conflicting {label}s")
+    return values[0]
+
+try:
+    records = []
+    with open(rollout_path, encoding="utf-8") as handle:
+        for line in handle:
+            records.append(json.loads(line))
+    sessions = [record.get("payload") for record in records if record.get("type") == "session_meta"]
+    turns = [record.get("payload") for record in records if record.get("type") == "turn_context"]
+    if len(sessions) != 1:
+        raise ValueError("missing or ambiguous session metadata")
+    if not turns:
+        raise ValueError("missing turn context")
+    session = sessions[0]
+    if not isinstance(session, dict):
+        raise ValueError("invalid session metadata")
+    session_thread_id = as_string_or_none(session.get("id"))
+    if session_thread_id != expected_thread_id:
+        raise ValueError("session metadata does not identify the requested thread")
+    agent_role = as_string_or_none(session.get("agent_role"))
+    if not agent_role:
+        raise ValueError("missing agent role")
+
+    models = [as_string_or_none(turn.get("model")) if isinstance(turn, dict) else None for turn in turns]
+    efforts = [as_string_or_none(turn.get("effort")) if isinstance(turn, dict) else None for turn in turns]
+    sandbox_types = [
+        as_string_or_none((turn.get("sandbox_policy") or {}).get("type"))
+        if isinstance(turn, dict) and isinstance(turn.get("sandbox_policy") or {}, dict)
+        else None
+        for turn in turns
+    ]
+    permission_types = [
+        as_string_or_none((turn.get("permission_profile") or {}).get("type"))
+        if isinstance(turn, dict) and isinstance(turn.get("permission_profile") or {}, dict)
+        else None
+        for turn in turns
+    ]
+    cwds = [as_string_or_none(turn.get("cwd")) if isinstance(turn, dict) else None for turn in turns]
+    payload = {
+        "thread_id": session_thread_id,
+        "parent_thread_id": as_string_or_none(session.get("parent_thread_id")),
+        "agent_role": agent_role,
+        "agent_path": as_string_or_none(session.get("agent_path")),
+        "model_provider": as_string_or_none(session.get("model_provider")),
+        "model": only(models, "model"),
+        "effort": only(efforts, "effort"),
+        "sandbox_policy_type": only(sandbox_types, "sandbox policy type"),
+        "permission_profile_type": only(permission_types, "permission profile type"),
+        "cwd": only(cwds, "working directory"),
+    }
+except (OSError, ValueError, json.JSONDecodeError):
+    raise SystemExit(1)
+
+print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+PY
+  then
+    fail "rollout is missing, ambiguous, invalid, or inconsistent required routing metadata."
+  fi
 fi
