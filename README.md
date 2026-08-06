@@ -35,6 +35,10 @@ Requirements common to both modes:
 - A current Codex CLI or ChatGPT desktop app with plugins enabled.
 - Access to GPT-5.6 Sol / High for the primary task.
 
+For user-facing reasoning selectors, English `High` and Swedish `Hög` are
+equivalent high labels (after ordinary whitespace/case normalization). Native config
+and runtime machine evidence remain canonical lowercase `high`.
+
 Additional native-mode requirements:
 
 - Native subagents and custom-agent support enabled.
@@ -135,9 +139,11 @@ native-agent refresh.
 
 Native spawn/details metadata is the primary source of routing evidence. It must show
 the selected custom agent type. When it also exposes model and effort, the orchestrator
-compares those values with the role pin. If Desktop omits model or effort and the local
-rollout is accessible, use the companion inspector as the authoritative read-only
-fallback for those omitted fields:
+compares those values with the role pin. It compares models exactly; for user-facing
+effort labels, `High` and `Hög` are the only equivalent high displays, while machine
+evidence remains `high`. If Desktop omits model or effort and the local rollout is
+accessible, use the companion inspector as the authoritative read-only fallback for
+those omitted fields:
 
 ~~~sh
 plugin_dir="$(codex plugin list --json | jq -r '.installed[] | select(.pluginId == "sol-advisor@sol-advisor") | .source.path')"
