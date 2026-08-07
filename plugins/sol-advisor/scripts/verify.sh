@@ -124,6 +124,9 @@ if not isinstance(interface, dict):
 prompts = interface.get("defaultPrompt")
 if not isinstance(prompts, list) or not prompts or not all(isinstance(item, str) for item in prompts):
     raise SystemExit("manifest defaultPrompt must be a non-empty string list")
+too_long = [index for index, prompt in enumerate(prompts) if len(prompt) > 128]
+if too_long:
+    raise SystemExit(f"manifest defaultPrompt entries exceed Codex's 128-character cap: {too_long}")
 
 surface = " ".join(
     value
@@ -179,7 +182,7 @@ for label, pattern in stale.items():
     if re.search(pattern, surface):
         raise SystemExit(f"manifest still claims {label}")
 PY
-pass "manifest JSON, version 0.5.1, and integrated policy metadata"
+pass "manifest JSON, version 0.5.1, integrated policy metadata, and 128-character defaultPrompt cap"
 
 python3 - "$templates" <<'PY'
 from pathlib import Path

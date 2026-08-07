@@ -16,6 +16,6 @@
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
     "websiteURL": "https://github.com/DannyMac180/sol-advisor",
-    "defaultPrompt": ["Use Sol Advisor's orchestration workflow with a gpt-5.6-sol / medium primary; when app task tools and accepted Luna Max routing are available, create and monitor user-visible Luna threads by default, otherwise follow the current shipped native workflow, then verify and accept the diff.", "For a larger project, write the PR dependency graph first, run independent nodes in parallel by layer, require commit/diff/tests/blockers from every child, and review/correct/submit each accepted PR before the next dependent stack.", "When every authorized graph node is accepted and integrated, tell the user which completed node tasks are safe to archive; archive only after explicit authorization, keep the leader task by default, and do not treat task archival as worktree deletion."]
+    "defaultPrompt": ["Use Sol Advisor's gpt-5.6-sol / medium primary and default monitored Luna Max route; verify and accept the diff.", "For larger work, create a layered PR graph; require each child's commit, diff, tests, and blockers before acceptance.", "After graph completion, identify safe tasks; archive only with explicit authorization; retain leader and Git resources."]
   }
 }
