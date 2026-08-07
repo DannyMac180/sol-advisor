@@ -1,0 +1,21 @@
+[project]
+name = "sol-orchestration"
+version = "0.1.0"
+description = "Cost-routed orchestration skeleton for the Prime Agent kernel."
+requires-python = ">=3.10"
+# Intentionally empty. prime-agent-runtime is bundled with Prime Agent and is not
+# published on PyPI: declaring it would break every install outside the kernel venv,
+# including the standalone test run. The runtime is imported lazily inside run().
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Must stay in step with the import name derived from the skill directory.
+# scripts/verify-prime-agent-package.sh fails the build if these disagree.
+packages = ["src/sol_orchestration"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
