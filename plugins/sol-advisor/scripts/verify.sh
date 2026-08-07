@@ -121,12 +121,30 @@ if data.get("version") != "0.5.1":
 interface = data.get("interface")
 if not isinstance(interface, dict):
     raise SystemExit("manifest interface metadata is missing")
+
+def validate_default_prompts(prompts):
+    if not isinstance(prompts, list) or not prompts or not all(isinstance(item, str) for item in prompts):
+        raise ValueError("must be a non-empty string list")
+    blank = [index for index, prompt in enumerate(prompts) if not prompt.strip()]
+    if blank:
+        raise ValueError(f"contains empty or whitespace-only entries: {blank}")
+    too_long = [index for index, prompt in enumerate(prompts) if len(prompt) > 128]
+    if too_long:
+        raise ValueError(f"entries exceed Codex's 128-character cap: {too_long}")
+
 prompts = interface.get("defaultPrompt")
-if not isinstance(prompts, list) or not prompts or not all(isinstance(item, str) for item in prompts):
-    raise SystemExit("manifest defaultPrompt must be a non-empty string list")
-too_long = [index for index, prompt in enumerate(prompts) if len(prompt) > 128]
-if too_long:
-    raise SystemExit(f"manifest defaultPrompt entries exceed Codex's 128-character cap: {too_long}")
+try:
+    validate_default_prompts(prompts)
+except ValueError as error:
+    raise SystemExit(f"manifest defaultPrompt {error}")
+
+for invalid_prompts in ([""], [" \t\n "]):
+    try:
+        validate_default_prompts(invalid_prompts)
+    except ValueError:
+        pass
+    else:
+        raise SystemExit("defaultPrompt regression check accepted an empty or whitespace-only entry")
 
 surface = " ".join(
     value
@@ -182,7 +200,7 @@ for label, pattern in stale.items():
     if re.search(pattern, surface):
         raise SystemExit(f"manifest still claims {label}")
 PY
-pass "manifest JSON, version 0.5.1, integrated policy metadata, and 128-character defaultPrompt cap"
+pass "manifest JSON, version 0.5.1, integrated policy metadata, non-blank defaultPrompt entries, and 128-character cap"
 
 python3 - "$templates" <<'PY'
 from pathlib import Path
