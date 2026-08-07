@@ -1,13 +1,23 @@
 # Sol Advisor
 
-**Sol runs the show. Choose the native Terra / High lane, or explicitly opt into
-user-visible Luna tasks; the primary Sol task owns verification and acceptance in
-both modes.**
+**Sol runs the show. The primary `gpt-5.6-sol` / Medium task owns architecture,
+verification, and acceptance; when app task tools and Luna Max routing are available,
+it creates and monitors user-visible Luna threads by default.**
 
 Sol Advisor is a Codex-native architect workflow for capability-routed software
 delivery. The primary session stays focused on requirements, architecture, specs, and
-verification while either native Codex custom-agent threads or separate Codex app
-tasks handle the bounded implementation work.
+verification while the current shipped native workflow or separate user-visible
+Codex app threads handle bounded implementation work.
+
+The primary Sol orchestrator runs on `gpt-5.6-sol` with medium reasoning. A plan has
+no plugin/global model or effort pin: it preserves the model and effort selected by
+the user or an authorized execution lane and never infers a primary pin from a plan.
+When the app task tools and accepted Luna Max routing are available, Sol treats Luna
+Max as a subagent-like, separate user-visible Codex thread that it creates, monitors,
+reviews, and accepts. Native execution and review routing remain decisions of Sol
+Advisor's current shipped workflow. Keep the exact shipped role names
+`sol_advisor_terra_implementer` and `sol_advisor_sol_reviewer`; this public surface
+does not rename or repin them or establish a separate global review model.
 
 ## Go deeper
 
@@ -15,25 +25,24 @@ I write [**Attention Heads**](https://attentionheads.substack.com/?utm_source=gi
 
 | Mode | Worker | Routing | Primary ownership |
 |---|---|---|---|
-| Native subagent (default) | `sol_advisor_terra_implementer`, then `sol_advisor_sol_reviewer` | GPT-5.6 Terra / High, then fresh GPT-5.6 Sol / High | Architecture, parent verification, and acceptance after the fresh native review |
-| Luna task (explicit opt-in) | User-visible Codex task created with app task tools | GPT-5.6 Luna / Max | Decomposition, task monitoring, actual diff review, corrections, PR authorization, dependent-stack ordering, and final acceptance |
+| Native subagent (current shipped workflow) | `sol_advisor_terra_implementer`, then `sol_advisor_sol_reviewer` | Current shipped native role routing and evidence gates | Architecture, parent verification, and acceptance after the shipped native review |
+| Luna task (default when app tools/routing are available) | Subagent-like, separate user-visible Codex thread created and monitored with app task tools | GPT-5.6 Luna / Max | Decomposition, task monitoring, actual diff review, corrections, PR submission/authorization, dependent-stack ordering, and final acceptance |
 
-The primary session is GPT-5.6 Sol / High in either mode. The native lane remains
-available and unchanged: it uses the separately installed Terra role and requires a
-fresh Sol reviewer. The Luna lane is outside native subagent V2, does not use a Luna
-custom-agent TOML, and never activates merely because this skill is installed.
+The primary session is GPT-5.6 Sol / Medium. The native lane remains available under
+its current shipped workflow and uses the separately installed role templates and
+runtime evidence gates. The Luna lane is outside native subagent V2, does not use a
+Luna custom-agent TOML, and is selected by the app-tool and routing capability gate.
 
-In the native lane, the final review is context-independent, not model-family-
-independent: Sol reviews Sol's orchestration with a fresh context. In the Luna lane,
-the primary Sol task itself reviews and accepts the Luna task's work; it does not route
-that lane through the native Sol reviewer.
+In the native lane, the shipped native review contract remains in force. In the Luna
+lane, the primary Sol task itself reviews and accepts the Luna task's work; it does
+not route that lane through the native Sol reviewer.
 
 ## Install from GitHub
 
 Requirements common to both modes:
 
 - A current Codex CLI or ChatGPT desktop app with plugins enabled.
-- Access to GPT-5.6 Sol / High for the primary task.
+- Access to GPT-5.6 Sol / Medium for the primary task.
 
 Additional native-mode requirements:
 
@@ -44,7 +53,6 @@ Additional native-mode requirements:
 
 Additional Luna task-mode requirements:
 
-- Explicit authorization in the user's current request.
 - Access to GPT-5.6 Luna / Max and the Codex app task tools (`list_projects`,
   `list_threads`, `create_thread`, `wait_threads`, `read_thread`, and
   `send_message_to_thread`).
@@ -80,21 +88,23 @@ missing template and then verifies every installed copy byte-for-byte.
 
 For native mode, start a **new Codex task** after the check passes. Native agent types
 are discovered at task creation, so an existing task may not see the installed roles.
-Then select GPT-5.6 Sol with High reasoning for the primary session and ask for
-implementation work normally, or invoke the orchestration skill explicitly:
+Then confirm GPT-5.6 Sol with Medium reasoning for the primary session and invoke the
+orchestration skill explicitly when the current shipped workflow selects the native
+lane:
 
 ~~~text
 Use $sol-advisor:orchestration to build this feature, verify it, and obtain the final Sol review before reporting done.
 ~~~
 
-For Luna-only use, skip the companion installation above and explicitly authorize the
-task lane in the current request, for example: “Use the Luna task lane for this
-feature.”
+When the app task tools and Luna Max routing are available, the default execution lane
+is the user-visible Luna task workflow below; it does not require native companion
+installation. If the current shipped workflow selects native execution instead, use
+the companion installation and evidence checks above.
 
 ## Check and update native mode
 
-Run this check whenever the native Terra / High route must be trusted. Luna-only users
-can skip this companion check:
+Run this check whenever Sol Advisor's current shipped workflow selects the native
+Terra / High route. Users on the default Luna task lane can skip this companion check:
 
 ~~~sh
 plugin_dir="$(codex plugin list --json | jq -r '.installed[] | select(.pluginId == "sol-advisor@sol-advisor") | .source.path')"
@@ -114,7 +124,7 @@ sh "$plugin_dir/scripts/install-agents.sh"
 sh "$plugin_dir/scripts/install-agents.sh" --check
 ~~~
 
-Version 0.4.0 retains the historical byte-exact v0.2.0 migration for
+Version 0.5.1 retains the historical byte-exact v0.2.0 migration for
 `sol-advisor-luna-implementer.toml` and `sol-advisor-terra-implementer.toml` files.
 Normal installer mode replaces the exact legacy Terra file with the current Terra /
 High template, removes the exact legacy Luna file, and refuses modified, nonregular,
@@ -128,8 +138,8 @@ task lane is an app-task workflow and must not add or restore a
 `sol-advisor-luna-implementer.toml` file.
 
 For native mode, do not use a substitute agent as a shortcut. Start a fresh task after
-every successful install or update. Luna-only use does not require this installer or a
-native-agent refresh.
+every successful install or update. The default Luna task lane does not require this
+installer or a native-agent refresh.
 
 ## Native runtime routing evidence
 
@@ -161,25 +171,30 @@ exist, they must agree.
 ## How routing works
 
 The Sol orchestrator keeps architecture, decomposition, verification, and acceptance
-in the primary session. The native lane uses the five-part implementation spec and
-routes production through Terra / High. The Luna lane uses a complete task packet with
-objective, files and ownership, interfaces, constraints, starting state/base,
-verification, git/PR boundary, and a structured return. Read the full app-task
-contract in [the Luna task-lane reference](plugins/sol-advisor/skills/orchestration/references/luna-task-lane.md).
+in the primary session. When app task tools and accepted Luna Max routing are
+available, the Luna lane is the default: it treats each child as a subagent-like,
+separate user-visible Codex thread created and monitored by Sol. The current shipped
+native workflow remains available with its five-part implementation spec and native
+runtime evidence gates. Both lanes use complete task packets with objective, files and
+ownership, interfaces, constraints, starting state/base, verification, git/PR
+boundary, and a structured return. Read the full app-task contract in [the Luna
+task-lane reference](plugins/sol-advisor/skills/orchestration/references/luna-task-lane.md).
 
-### Luna task lane (explicit opt-in)
+### Luna task lane (default when app tools/routing are available)
 
-Use this lane only when the user's current request explicitly authorizes it, for
-example:
+Use this lane whenever the required Codex app task tools and accepted GPT-5.6 Luna /
+Max routing are available. If a required Luna capability is unavailable, stop that
+lane without silently substituting a model, effort, agent, or native route; native
+execution may still be selected by Sol Advisor's current shipped workflow.
 
-~~~text
-Use the Luna task lane for this feature.
-~~~
-
-Skill activation, a general request to implement, or a previous authorization is not
-enough. If the user does not explicitly opt in, keep the native lane or ask for that
-authorization. The lane stops without fallback if GPT-5.6 Luna, Max reasoning, or any
-required app task tool is unavailable.
+For a larger project, first write and record the PR dependency graph. Each node names
+its owned files, starting base, dependencies, verification commands, and PR boundary.
+Run independent, non-overlapping nodes in parallel by graph layer as separate Luna
+Max threads; serialize shared-file or dependent nodes. Every child reports its commit,
+complete diff, tests, and blockers before it completes. Sol independently reviews the
+actual worktree and evidence, sends corrections to the same task when needed, and
+submits or explicitly authorizes each accepted PR before starting the next dependent
+stack or graph layer.
 
 The primary task then:
 
@@ -212,11 +227,19 @@ primary still reviews every diff and orders dependent work from an accepted base
 The complete packet, tool sequence, branch rules, and return schema are defined in
 [the Luna task-lane reference](plugins/sol-advisor/skills/orchestration/references/luna-task-lane.md).
 
-### Native subagent lane
+After every authorized graph node is accepted and integrated, Sol inspects the actual
+task list and tells the user which completed node tasks are safe to archive. It
+does not archive user-visible tasks until the user explicitly authorizes that action,
+keeps the primary leader task available by default, and reports exact task identities
+when possible. Task archival only organizes the Codex task list; it does not delete
+Git worktrees, branches, commits, or artifacts, and worktree cleanup remains a
+separate operation.
 
-Unless the user explicitly opts into Luna, the native lane remains the default. It
-uses the installed Terra role for implementation and a fresh Sol reviewer after
-parent verification. It does not use the app-task tools for implementation.
+### Native subagent lane (current shipped workflow)
+
+When Sol Advisor's current shipped workflow selects native execution, it uses the
+installed Terra role for implementation and a fresh Sol reviewer after parent
+verification. It does not use the app-task tools for implementation.
 
 Before delegation and acceptance, the skill requires all of the following:
 
@@ -268,8 +291,8 @@ sh plugins/sol-advisor/scripts/verify.sh
 git diff --check
 ~~~
 
-The installer commands below are native-mode only. Luna-only users do not need to
-install or check companion agents.
+The installer commands below are native-mode only. Users on the default Luna task
+lane do not need to install or check companion agents.
 
 To exercise the native installer itself against an explicit disposable target:
 

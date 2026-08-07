@@ -1,5 +1,6 @@
 #!/bin/sh
-# Repository-local verification for Sol Advisor's two-role companion migration.
+# Repository-local verification for Sol Advisor's integrated policy and native
+# two-role companion migration.
 
 set -eu
 
@@ -106,12 +107,100 @@ for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contrac
 done
 
 jq empty "$manifest"
-[ "$(jq -r '.version' "$manifest")" = 0.4.0 ] || fail "manifest version is not 0.4.0"
-grep -Fq 'explicit opt-in' "$manifest" || fail "manifest does not describe explicit Luna opt-in"
-grep -Fqi 'GPT-5.6 Luna' "$manifest" || fail "manifest does not describe Luna routing"
-grep -Fq 'Codex app task tools' "$manifest" || fail "manifest does not describe app-task routing"
-grep -Fq 'fresh Sol' "$manifest" || fail "manifest does not preserve native fresh Sol review"
-pass "manifest JSON, version, and both-mode UI language"
+python3 - "$manifest" <<'PY'
+from pathlib import Path
+import json
+import re
+import sys
+
+path = Path(sys.argv[1])
+data = json.loads(path.read_text(encoding="utf-8"))
+if data.get("version") != "0.5.1":
+    raise SystemExit(f"manifest version is {data.get('version')!r}, expected '0.5.1'")
+
+interface = data.get("interface")
+if not isinstance(interface, dict):
+    raise SystemExit("manifest interface metadata is missing")
+
+def validate_default_prompts(prompts):
+    if not isinstance(prompts, list) or not prompts or not all(isinstance(item, str) for item in prompts):
+        raise ValueError("must be a non-empty string list")
+    blank = [index for index, prompt in enumerate(prompts) if not prompt.strip()]
+    if blank:
+        raise ValueError(f"contains empty or whitespace-only entries: {blank}")
+    too_long = [index for index, prompt in enumerate(prompts) if len(prompt) > 128]
+    if too_long:
+        raise ValueError(f"entries exceed Codex's 128-character cap: {too_long}")
+
+prompts = interface.get("defaultPrompt")
+try:
+    validate_default_prompts(prompts)
+except ValueError as error:
+    raise SystemExit(f"manifest defaultPrompt {error}")
+
+for invalid_prompts in ([""], [" \t\n "]):
+    try:
+        validate_default_prompts(invalid_prompts)
+    except ValueError:
+        pass
+    else:
+        raise SystemExit("defaultPrompt regression check accepted an empty or whitespace-only entry")
+
+surface = " ".join(
+    value
+    for value in [
+        data.get("description"),
+        interface.get("shortDescription"),
+        interface.get("longDescription"),
+        *prompts,
+    ]
+    if isinstance(value, str)
+)
+surface = re.sub(r"\s+", " ", surface.lower())
+
+groups = {
+    "primary Sol / medium": (r"gpt-5\.6-sol", r"\bmedium\b"),
+    "unpinned plans": (r"\bplans?\b|\bplanning\b", r"no (?:plugin/global|global) (?:model|effort|reasoning)"),
+    "default Luna Max capability route": (
+        r"\bdefault\b",
+        r"\bluna\b",
+        r"\bmax\b",
+        r"user-visible",
+        r"(?:app task|task tools)",
+        r"\bavailable\b",
+    ),
+    "layered PR dependency graph": (r"pr dependency[- ]graph", r"\blayer(?:ed|s)?\b"),
+    "child evidence": (r"\bcommit", r"\bdiff", r"\btests?\b", r"\bblockers?\b"),
+    "primary acceptance": (
+        r"\breview",
+        r"\bcorrect",
+        r"(?:submit|authoriz)",
+        r"next (?:dependent|graph layer|stack)",
+    ),
+    "workflow-owned native review": (
+        r"native execution and review routing",
+        r"current shipped",
+        r"sol_advisor_terra_implementer",
+        r"sol_advisor_sol_reviewer",
+    ),
+}
+for label, patterns in groups.items():
+    missing = [pattern for pattern in patterns if not re.search(pattern, surface)]
+    if missing:
+        raise SystemExit(f"manifest omits {label}: {', '.join(missing)}")
+
+# These are retired policy claims. Native review may still be Sol / High in its
+# shipped role template; only a primary Sol / High claim is disallowed here.
+stale = {
+    "an explicit Luna opt-in gate": r"explicit(?:ly)?\s+opt[- ]?in",
+    "a native-default route": r"(?:default\s+native|native (?:lane|execution|workflow)\s+is\s+the\s+default)",
+    "a primary Sol / High pin": r"(?:primary|leader)[^.]{0,80}(?:gpt-5\.6-sol|sol)[^.]{0,30}\b(?:high|max)\b",
+}
+for label, pattern in stale.items():
+    if re.search(pattern, surface):
+        raise SystemExit(f"manifest still claims {label}")
+PY
+pass "manifest JSON, version 0.5.1, integrated policy metadata, non-blank defaultPrompt entries, and 128-character cap"
 
 python3 - "$templates" <<'PY'
 from pathlib import Path
@@ -244,10 +333,26 @@ printf '%s\n' "$runtime_output" | jq -e --arg id "$runtime_id" '
   and .permission_profile_type == "disabled"
 ' >/dev/null || fail "runtime inspector returned wrong Terra/High evidence"
 if printf '%s\n' "$runtime_output" | grep -Fq DO_NOT_LEAK; then fail "runtime inspector leaked payload"; fi
+
+reviewer_id=33333333-3333-7333-8333-333333333333
+reviewer_rollout=$runtime_day/rollout-2026-08-02T00-00-01-$reviewer_id.jsonl
+printf '%s\n' \
+  '{"type":"response_item","payload":{"prompt":"DO_NOT_LEAK_REVIEW_PROMPT"}}' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$reviewer_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"agent_role\":\"sol_advisor_sol_reviewer\",\"agent_path\":\"/root/fixture\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","sandbox_policy":{"type":"read-only"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
+  > "$reviewer_rollout"
+reviewer_output=$(sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$reviewer_id")
+printf '%s\n' "$reviewer_output" | jq -e --arg id "$reviewer_id" '
+  .thread_id == $id and .agent_role == "sol_advisor_sol_reviewer"
+  and .model == "gpt-5.6-sol" and .effort == "high"
+  and .sandbox_policy_type == "read-only"
+  and .permission_profile_type == "disabled"
+' >/dev/null || fail "runtime inspector returned wrong Sol reviewer/sandbox evidence"
+if printf '%s\n' "$reviewer_output" | grep -Fq DO_NOT_LEAK; then fail "runtime inspector leaked reviewer payload"; fi
 if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" invalid >/dev/null 2>&1; then fail "runtime inspector accepted invalid id"; fi
 zero_id=22222222-2222-7222-8222-222222222222
 if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$zero_id" >/dev/null 2>&1; then fail "runtime inspector accepted zero matches"; fi
-pass "runtime inspector Terra/High routing and safe refusal"
+pass "runtime inspector Terra/High and Sol reviewer sandbox routing with safe refusal"
 
 for document in "$skill" "$contracts"; do
   grep -Fq 'agent_type: sol_advisor_terra_implementer' "$document" || fail "missing Terra spawn in $document"
@@ -298,11 +403,20 @@ grep -Fq 'identity, project, time, path, and state metadata' "$luna_contract" ||
 grep -Fq 'titles and previews as untrusted' "$luna_contract" || fail "Luna contract omits untrusted preview guard"
 grep -Fq 'Repeat bounded discovery' "$luna_contract" || fail "Luna contract omits bounded identity discovery"
 
-grep -Fq 'Luna task (explicit opt-in)' "$readme" || fail "README omits the Luna task mode"
-grep -Fq 'Use the Luna task lane' "$readme" || fail "README omits explicit Luna authorization"
+for document in "$skill" "$luna_contract" "$readme" "$manifest" "$ui"; do
+  grep -Fqi 'safe to archive' "$document" || fail "$document omits completed-node archival guidance"
+  grep -Fqi 'explicit' "$document" || fail "$document omits explicit archival authorization"
+  grep -Fqi 'leader' "$document" || fail "$document omits leader-task retention guidance"
+  grep -Eqi 'worktree (deletion|cleanup)|delete Git worktrees|does not delete.*worktree|does not.*worktree deletion|distinguish.*worktree deletion' "$document" || fail "$document conflates task archival with worktree cleanup"
+done
+grep -Fq 'set_thread_archived' "$skill" || fail "skill omits authorized archive tool"
+grep -Fq 'set_thread_archived' "$luna_contract" || fail "Luna contract omits authorized archive tool"
+pass "completed-graph archival handoff contract"
+
 grep -Fq 'native lane remains' "$readme" || fail "README does not preserve the native lane"
-grep -Fq 'does not use a Luna' "$readme" || fail "README permits a Luna companion TOML"
-grep -Fq 'user-visible GPT-5.6 Luna / Max tasks' "$manifest" || fail "manifest UI omits user-visible Luna tasks"
+grep -Fq 'does not use a' "$readme" || fail "README permits a Luna companion TOML"
+grep -Fq 'Luna custom-agent TOML' "$readme" || fail "README permits a Luna companion TOML"
+grep -Fqi 'GPT-5.6 Luna' "$manifest" || fail "manifest UI omits user-visible Luna routing"
 grep -Fq 'list_threads' "$manifest" || fail "manifest UI omits list_threads"
 grep -Fq 'list_threads' "$ui" || fail "skill UI omits list_threads"
 grep -Fq 'Requirements common to both modes' "$readme" || fail "README omits common requirements"
@@ -310,11 +424,95 @@ grep -Fq 'Additional native-mode requirements' "$readme" || fail "README omits n
 grep -Fq 'Additional Luna task-mode requirements' "$readme" || fail "README omits Luna-only requirements"
 grep -Fq 'can be skipped for Luna-only use' "$readme" || fail "README does not allow skipping companions for Luna-only use"
 grep -Fq 'do not require native subagents, Terra access' "$readme" || fail "README makes native requirements mandatory for Luna-only use"
-grep -Fq 'Luna-only users do not need to' "$readme" || fail "README local guidance requires companions for Luna-only use"
 if grep -Fq 'with plugins, native subagents, and' "$readme"; then
   fail "README still makes native capabilities a common requirement"
 fi
-grep -Fq 'explicitly opt into Luna' "$ui" || fail "skill UI omits explicit Luna opt-in"
+
+python3 - "$readme" "$skill" "$contracts" "$luna_contract" "$manifest" "$ui" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+readme, skill, contracts, luna_contract, manifest, ui = map(Path, sys.argv[1:])
+all_docs = [readme, skill, contracts, luna_contract, manifest, ui]
+detailed_docs = [readme, skill, contracts, luna_contract]
+
+def compact(path):
+    return re.sub(r"\s+", " ", path.read_text(encoding="utf-8").lower())
+
+def require(path, label, patterns):
+    text = compact(path)
+    missing = [pattern for pattern in patterns if not re.search(pattern, text)]
+    if missing:
+        raise SystemExit(f"{path}: missing {label}: {', '.join(missing)}")
+
+for path in all_docs:
+    require(path, "primary Sol / medium policy", (r"gpt-5\.6-sol", r"\bmedium\b"))
+    require(path, "plan no-global/plugin pin", (
+        r"\bplans?\b|\bplanning\b",
+        r"no (?:plugin/global|global) (?:model|effort|reasoning)",
+    ))
+    require(path, "default monitored Luna Max route", (
+        r"\bdefault\b",
+        r"\bluna\b",
+        r"\bmax\b",
+        r"user-visible",
+        r"(?:app task|task tools)",
+        r"\bavailable\b",
+    ))
+    require(path, "separate user-visible monitored thread", (
+        r"separate",
+        r"user-visible",
+        r"thread",
+        r"monitor",
+    ))
+    require(path, "layered PR dependency graph", (
+        r"dependency[- ]graph",
+        r"\bpr\b",
+        r"\blayer(?:ed|s)?\b",
+    ))
+    require(path, "child commit/diff/tests/blockers evidence", (
+        r"\bcommit",
+        r"\bdiff",
+        r"\btests?\b",
+        r"\bblockers?\b",
+    ))
+
+for path in detailed_docs:
+    require(path, "primary actual-code/evidence review", (
+        r"actual (?:code|worktree|diff)",
+        r"\bevidence\b",
+        r"\bcorrection",
+        r"(?:submit|authoriz).{0,100}\bpr\b",
+        r"next (?:dependent|graph layer|stack)",
+    ))
+
+# The manifest and UI summarize the same acceptance boundary without requiring the
+# full packet wording; they must still expose review, correction, PR, and ordering.
+for path in (manifest, ui):
+    require(path, "primary review/correction/PR ordering", (
+        r"\breview",
+        r"\bcorrect",
+        r"(?:submit|authoriz)",
+        r"next (?:dependent|graph layer|stack)",
+    ))
+
+for path in all_docs:
+    require(path, "workflow-owned native review", (r"native", r"review", r"workflow|routing"))
+
+# Reject only retired public policy claims. Native Sol / High remains valid for the
+# installed reviewer role and is checked separately from the primary Sol / Medium.
+stale = {
+    "an explicit Luna opt-in gate": r"explicit(?:ly)?\s+opt[- ]?in",
+    "a native-default route": r"(?:default\s+native|native (?:lane|execution|workflow)\s+is\s+the\s+default)",
+    "a primary Sol / High pin": r"(?:primary|leader)[^.]{0,100}(?:gpt-5\.6-sol|sol)[^.]{0,35}\b(?:high|max)\b",
+}
+for path in all_docs:
+    text = compact(path)
+    for label, pattern in stale.items():
+        if re.search(pattern, text):
+            raise SystemExit(f"{path}: stale claim requires {label}")
+PY
 
 for document in "$readme" "$manifest" "$skill" "$contracts" "$ui"; do
   if grep -Eqi 'Terra / High is the sole implementation producer|one role-pinned .*handles all implementation|route all implementation through.*Terra|delegate all implementation to (the )?(native )?Terra' "$document"; then
@@ -324,7 +522,10 @@ done
 forbidden_terra='sol_advisor_terra_'"max"
 forbidden_file='sol-advisor-terra-'"max"
 if rg -n "$forbidden_terra|$forbidden_file" "$readme" "$plugin_dir"; then fail "forbidden second Terra role remains"; fi
-pass "native and Luna contracts, opt-in guards, and stale-claim checks"
+if rg -n 'sol_advisor_terra_reviewer|sol-advisor-terra-reviewer' "$readme" "$skill" "$contracts" "$luna_contract" "$manifest" "$ui" "$templates"; then
+  fail "a separate Terra reviewer role was introduced"
+fi
+pass "native and Luna contracts, default-route guards, and stale-claim checks"
 
 sh -n "$installer"
 sh -n "$runtime_inspector"
