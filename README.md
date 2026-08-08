@@ -33,8 +33,10 @@ is missing, corrupt, or from an unsupported schema.
 
 Logical, non-secret preferences live in `${PLUGIN_DATA}/config.json`. Generated
 client files are separate and appear only after an exact preview and explicit bound
-confirmation. Bun is the only runtime prerequisite for the MCP server; the packaged
-runtime has no repository-root or third-party runtime dependency.
+confirmation. Bun is the only external runtime prerequisite for the MCP server. On
+Windows, the server also uses the OS-provided Windows PowerShell 5.1 to validate
+directory ACLs; the packaged runtime has no repository-root or third-party runtime
+dependency.
 
 ## First-use interview
 
@@ -295,7 +297,7 @@ sh "$plugin_dir/scripts/inspect-agent-runtime.sh" <native-subagent-thread-id>
 
 - Sol Advisor fails closed: it chooses no fallback models, guessed aliases, or arbitrary write paths.
 - Cursor itself may fall back when a pinned model is unavailable or restricted. Sol Advisor never chooses that fallback but cannot detect or prevent it.
-- `${PLUGIN_DATA}` must be an absolute existing `0700`-equivalent directory: never `/`, the home directory, the plugin root, or a path with symlink ancestors. Its realpath/device/inode are pinned for the server process; Sol Advisor never chmods the host-supplied root.
+- `${PLUGIN_DATA}` must be an absolute existing private directory: on Linux and macOS it may have no group/world permission bits; on Windows its owner must be the current user, SYSTEM, or Administrators, and allow ACEs are restricted to those principals plus CREATOR OWNER and OWNER RIGHTS. A null DACL is always rejected. The directory may never be the filesystem root, home directory, plugin root, or a path with symlink ancestors. Its realpath/device/inode are pinned for the server process; Sol Advisor never changes permissions on the host-supplied root.
 - Install and uninstall use fsynced transaction journals, same-directory staging/quarantine, immediate hash/ancestor checks, and no-clobber creation. Recovery mutates only validated active-profile allowlisted paths with exact recorded hashes.
 - Configuration is non-secret state; adapter files are allowlisted.
 - Exact preview consent is necessary but does not establish client capability.

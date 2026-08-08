@@ -12,6 +12,7 @@ All notable changes to Sol Advisor are documented here. This project follows
 
 ### Fixed
 
+- Windows now validates `${PLUGIN_DATA}` and backup privacy from owner and ACL SIDs instead of Bun's POSIX mode projection, while retaining POSIX mode checks on Linux and macOS.
 - Cursor 3.15.6 local installation now uses a verified directory copy instead of an externally resolved symlink.
 - Replaced the ineffective GUI `PATH` relaunch workaround with a project-native MCP bridge after live testing showed Cursor's plugin MCP process cannot resolve the canonical bare `bun` command.
 - Documented Cursor 3.15.6's independent Customize workspace selector, repeated source-consent boundary, and full-process restart fallback when a window reload leaves the shared MCP process disconnected.

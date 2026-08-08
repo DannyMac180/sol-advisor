@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 import { createHash, randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync, copyFileSync, chmodSync, linkSync, statSync, openSync, fsyncSync, closeSync } from "node:fs";
-import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { homedir, platform } from "node:os";
+import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 
 export const CONFIG_SCHEMA_VERSION = 1;
 export const MANAGED_MARKER = "sol-advisor-managed:v1";
@@ -28,6 +29,56 @@ type Manifest = { schemaVersion: 1; files: ManagedFile[]; updatedAt: string };
 const pluginRoot = resolve(import.meta.dir, "..");
 let pinnedDataDir:{lexical:string;real:string;dev:number;ino:number}|undefined;
 export function __resetDataPinForTests(){pinnedDataDir=undefined;}
+const windowsAclCheck = String.raw`
+$ErrorActionPreference = "Stop"
+$target = [Environment]::GetEnvironmentVariable("SOL_ADVISOR_ACL_PATH", "Process")
+$security = [IO.Directory]::GetAccessControl($target)
+$currentUser = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$allowedOwners = @(
+  $currentUser,
+  "S-1-5-18",
+  "S-1-5-32-544"
+)
+$owner = $security.GetOwner([Security.Principal.SecurityIdentifier]).Value
+if ($allowedOwners -notcontains $owner) { Write-Output "unsafe-owner"; exit 0 }
+$raw = [Security.AccessControl.RawSecurityDescriptor]::new($security.GetSecurityDescriptorBinaryForm(), 0)
+if ($null -eq $raw.DiscretionaryAcl) { Write-Output "unsafe-null-dacl"; exit 0 }
+$allowed = @(
+  $currentUser,
+  "S-1-5-18",
+  "S-1-5-32-544",
+  "S-1-3-0",
+  "S-1-3-4"
+)
+foreach ($entry in $security.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
+  if ($entry.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) { continue }
+  $sid = $entry.IdentityReference.Value
+  if ($allowed -notcontains $sid) { Write-Output "unsafe-access"; exit 0 }
+}
+Write-Output "private"
+`;
+function assertPrivateDirectory(path:string,label:string){
+  if(platform()!=="win32"){
+    if((statSync(path).mode&0o077)!==0)throw new Error(`${label} must be private (no group/world permission bits)`);
+    return;
+  }
+  if(activeWindowsAclChecks?.has(path))return;
+  let result:string;
+  try{
+    const roots=[join(parse(homedir()).root,"Windows"),process.env.SystemRoot,process.env.WINDIR].filter((root):root is string=>typeof root==="string"&&isAbsolute(root));
+    const powershell=roots.map(root=>join(root,"System32","WindowsPowerShell","v1.0","powershell.exe")).find(candidate=>existsSync(candidate)&&lstatSync(candidate).isFile()&&!lstatSync(candidate).isSymbolicLink());
+    if(!powershell)throw new Error("Windows PowerShell is unavailable");
+    result=execFileSync(powershell,["-NoLogo","-NoProfile","-NonInteractive","-Command",windowsAclCheck],{encoding:"utf8",env:{...process.env,SOL_ADVISOR_ACL_PATH:path},timeout:30000,windowsHide:true}).trim();
+  }catch(error){
+    const code=error&&typeof error==="object"&&"code" in error&&typeof error.code==="string"?error.code:"unknown";
+    throw new Error(`${label} ACL could not be verified (${code})`);
+  }
+  if(result!=="private"){
+    const reason=result==="unsafe-owner"?"owner is outside the approved Windows principals":result==="unsafe-null-dacl"?"null DACL grants unrestricted access":result==="unsafe-access"?"ACL contains an unapproved allow ACE":"Windows ACL verification returned an unexpected result";
+    throw new Error(`${label} must be private (${reason})`);
+  }
+  activeWindowsAclChecks?.add(path);
+}
 function dataDir(): string {
   const raw=process.env.PLUGIN_DATA;
   if (!raw || !isAbsolute(raw)) throw new Error("PLUGIN_DATA must be an explicit absolute existing directory");
@@ -36,16 +87,16 @@ function dataDir(): string {
   let cursor=resolve(sep); for(const part of relative(resolve(sep),lexical).split(sep).filter(Boolean)){cursor=join(cursor,part);if(existsSync(cursor)&&lstatSync(cursor).isSymbolicLink())throw new Error(`PLUGIN_DATA has symlink ancestor: ${cursor}`);}
   if (!existsSync(lexical) || !lstatSync(lexical).isDirectory() || lstatSync(lexical).isSymbolicLink()) throw new Error("PLUGIN_DATA must be an existing non-symlink directory");
   const actual=realpathSync(lexical), st=statSync(actual), pinned=pinnedDataDir;
-  if((st.mode&0o077)!==0)throw new Error("PLUGIN_DATA must be private (no group/world permission bits)");
+  assertPrivateDirectory(actual,"PLUGIN_DATA");
   if(pinned&&(pinned.lexical!==lexical||pinned.real!==actual||pinned.dev!==st.dev||pinned.ino!==st.ino))throw new Error("PLUGIN_DATA identity changed during this server process");
   if(!pinned)pinnedDataDir={lexical,real:actual,dev:st.dev,ino:st.ino}; return actual;
 }
 function configPath() { return join(dataDir(), "config.json"); }
 function manifestPath() { return join(dataDir(), "managed-files.json"); }
-function backupDir(){const root=dataDir(),path=join(root,"backups");if(!existsSync(path))mkdirSync(path,{mode:0o700});const info=lstatSync(path);if(info.isSymbolicLink()||!info.isDirectory())throw new Error("PLUGIN_DATA backups must be a real directory");const actual=realpathSync(path),rel=relative(root,actual);if(rel!=="backups"||isAbsolute(rel)||rel.startsWith(".."))throw new Error("PLUGIN_DATA backups escapes the pinned data root");if((statSync(actual).mode&0o077)!==0)throw new Error("PLUGIN_DATA backups must be private");return actual;}
+function backupDir(){const root=dataDir(),path=join(root,"backups");if(!existsSync(path))mkdirSync(path,{mode:0o700});const info=lstatSync(path);if(info.isSymbolicLink()||!info.isDirectory())throw new Error("PLUGIN_DATA backups must be a real directory");const actual=realpathSync(path),rel=relative(root,actual);if(rel!=="backups"||isAbsolute(rel)||rel.startsWith(".."))throw new Error("PLUGIN_DATA backups escapes the pinned data root");assertPrivateDirectory(actual,"PLUGIN_DATA backups");return actual;}
 function sha(text: string | Uint8Array) { return createHash("sha256").update(text).digest("hex"); }
-function syncFile(path:string){const fd=openSync(path,"r");try{fsyncSync(fd);}finally{closeSync(fd);}}
-function syncDir(path:string){const fd=openSync(path,"r");try{fsyncSync(fd);}finally{closeSync(fd);}}
+function syncFile(path:string){const fd=openSync(path,platform()==="win32"?"r+":"r");try{fsyncSync(fd);}finally{closeSync(fd);}}
+function syncDir(path:string){const fd=openSync(path,platform()==="win32"?"r+":"r");try{fsyncSync(fd);}finally{closeSync(fd);}}
 function atomicWrite(path: string, text: string) {
   mkdirSync(dirname(path), { recursive: true });
   const temp = join(dirname(path), `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`);
@@ -259,7 +310,10 @@ export const tools = [
   {name:"validate_configuration",description:"Validate setup and optionally renderability",inputSchema:objectSchema({workspace:str})},
   {name:"reset_configuration",description:"Reset logical configuration with exact confirmation",inputSchema:objectSchema({confirmationToken:str})}
 ];
+let activeWindowsAclChecks:Set<string>|undefined;
 export async function callTool(name:string,args:any={}) {
+ const previousAclChecks=activeWindowsAclChecks;if(platform()==="win32")activeWindowsAclChecks=new Set();
+ try{
   const allowed:Record<string,string[]>={get_setup_status:[],get_preferences:[],save_preferences:["client","scope","workspace","orchestrator","roles","appTaskLane"],render_client_adapter:["workspace"],install_client_adapter:["workspace","confirmationToken","userScopeConfirmationToken"],uninstall_client_adapter:["confirmationToken"],validate_configuration:["workspace"],reset_configuration:["confirmationToken"]};
   if(!(name in allowed)) throw new Error(`unknown tool: ${name}`); rejectUnknown(args,allowed[name]!,name); recoverTransaction();
   if(name!=="save_preferences") for(const [key,value] of Object.entries(args)) if(typeof value==="string"&&/[\r\n\0]/.test(value)) throw new Error(`${key} contains control characters`);
@@ -272,6 +326,7 @@ export async function callTool(name:string,args:any={}) {
   if(name==="validate_configuration") { const s=configState(); return {status:s.status,valid:s.status==="ready",detail:s.detail,...(s.status==="ready"&&args.workspace?{preview:renderAdapter(s.preferences!,args.workspace)}:{})}; }
   if(name==="reset_configuration") return resetConfiguration(args);
   throw new Error(`unknown tool: ${name}`);
+ }finally{activeWindowsAclChecks=previousAclChecks;}
 }
 function response(id:unknown,result?:unknown,error?:unknown,code=-32000){ return error?{jsonrpc:"2.0",id,error:{code,message:error instanceof Error?error.message:String(error)}}:{jsonrpc:"2.0",id,result}; }
 export async function handle(message:any){
