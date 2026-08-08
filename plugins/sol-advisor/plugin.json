@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "sol-advisor",
-  "version": "0.5.0",
-  "description": "Configurable cross-client architect orchestration with lazy setup, exact user-selected native roles, safe adapter installation, and a separate explicit Codex Luna app-task lane.",
+  "version": "0.5.2",
+  "description": "Configurable cross-client architect orchestration with lazy setup, exact user-selected native roles, safe adapter installation, and a default independent Luna Max user-visible task lane where the Sol leader creates, monitors, corrects, reviews, and accepts each task when app-task capabilities are available; native Terra/fresh-Sol routing remains available.",
   "author": {
     "name": "Daniel McAteer",
     "url": "https://github.com/DannyMac180"

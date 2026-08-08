@@ -16,6 +16,17 @@ All notable changes to Sol Advisor are documented here. This project follows
 - Replaced the ineffective GUI `PATH` relaunch workaround with a project-native MCP bridge after live testing showed Cursor's plugin MCP process cannot resolve the canonical bare `bun` command.
 - Documented Cursor 3.15.6's independent Customize workspace selector, repeated source-consent boundary, and full-process restart fallback when a window reload leaves the shared MCP process disconnected.
 
+## [0.5.2] - 2026-08-08
+
+### Added
+
+- Normative default Luna Max task lane: when the app-task capability gate passes, the Sol leader creates each execution unit as an independent, subagent-like, user-visible task, monitors it, sends corrections to that same task, and independently reviews and accepts the corrected task.
+- Retained native Terra implementer and fresh Sol reviewer routing as an available, unchanged delivery lane.
+
+### Changed
+
+- Canonical Agent Plugins v1 metadata, the Codex compatibility manifest, package metadata, and MCP runtime version surfaces now report 0.5.2 coherently.
+
 ## [0.5.0] - 2026-08-07
 
 ### Added
@@ -35,5 +46,6 @@ All notable changes to Sol Advisor are documented here. This project follows
 - Retained native Codex delivery on Terra / High with a fresh Sol / High review.
 - Retired the Luna native companion role while preserving exact legacy migration.
 
-[Unreleased]: https://github.com/DannyMac180/sol-advisor/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/DannyMac180/sol-advisor/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/DannyMac180/sol-advisor/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/DannyMac180/sol-advisor/releases/tag/v0.5.0

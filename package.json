@@ -1,6 +1,6 @@
 {
   "name": "sol-advisor-validation",
-  "version": "0.5.0",
+  "version": "0.5.2",
   "private": true,
   "type": "module",
   "scripts": {

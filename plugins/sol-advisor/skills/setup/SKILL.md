@@ -1,6 +1,6 @@
 ---
 name: setup
-description: "Run Sol Advisor's first-use or reconfiguration interview in the parent chat, validate exact client-native model choices, persist logical preferences, preview native adapter files, and install only after explicit confirmation."
+description: "Run Sol Advisor's first-use or reconfiguration interview in the parent chat, validate exact client-native model choices, preserve the default capability-gated Luna Max app-task lane, preview native adapter files, and install only after explicit confirmation."
 ---
 
 # Sol Advisor setup
@@ -25,15 +25,28 @@ Ask one focused question at a time:
 6. Confirm the advisor is requested as read-only. Explain that behavioral read-only
    is not OS enforcement unless the client exposes sandbox evidence.
 7. Confirm fail-closed behavior: no fallback roles or models.
-8. Preserve the optional Codex app-task lane separately. Enable Luna / Max only after
-   explicit opt-in; it is never a fallback or a routine native role.
+8. Keep the Codex app-task lane outside the native roles. When the app-task capability
+   gate passes, Luna / Max is the default user-visible execution lane; do not ask for a
+   separate lane opt-in. It is never a fallback or a routine native role. If the gate is
+   unavailable, stop that app lane without treating native execution as its fallback;
+   native execution remains a separate workflow selected by Sol Advisor.
 
 Offer these current Codex recommendations as editable defaults, not universal IDs:
 
 - routine: `gpt-5.6-terra`, effort `high`
 - high: `gpt-5.6-terra`, effort `high`
 - advisor: `gpt-5.6-sol`, effort `high`, requested read-only
-- orchestrator: always `inherit`; recommend selecting Sol / High in the main chat
+- orchestrator persisted value: `inherit` (portable storage only; it cannot repin the
+  parent); recommend selecting `gpt-5.6-sol` / `medium` in the live primary chat
+
+The portable preference schema deliberately stores `orchestrator.model="inherit"`: this
+preserves parent-model semantics but cannot repin the parent. Sol Advisor's live primary
+must still be `gpt-5.6-sol` with medium reasoning, so select Sol / Medium in the main chat.
+The stored `inherit` value does not override that runtime requirement.
+
+The persisted `appTaskLane` field is compatibility state, not a lane-start authorization.
+If present, it must be exactly `enabled: true`, `model: gpt-5.6-luna`, and `effort: max`.
+Omitting it does not disable the default capability-gated Codex app-task lane.
 
 Call `save_preferences` only after showing the complete logical preference object.
 Use no secrets. For an unsupported execution surface (ChatGPT Work web, Kiro web/mobile, or a

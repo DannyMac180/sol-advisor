@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, existsSync, realpathSync, chmodSync, statSync, renameSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { __resetDataPinForTests, __setManifestWriteFaultForTests, callTool, handle, renderAdapter } from "./server";
+import { __resetDataPinForTests, __setManifestWriteFaultForTests, callTool, handle, renderAdapter, PLUGIN_VERSION, validatePreferences } from "./server";
 
 let root="", data="", workspace="";
 const base=(client="codex",scope="project")=>({client,scope,workspace,orchestrator:{model:"inherit",recommendation:{model:"gpt-5.6-sol",effort:"high"}},roles:{routine:{model:"gpt-5.6-terra",...(client==="codex"||client==="cursor"?{effort:"high"}:{})},high:{model:"gpt-5.6-terra",...(client==="codex"||client==="cursor"?{effort:"high"}:{})},advisor:{model:"gpt-5.6-sol",...(client==="codex"||client==="cursor"?{effort:"high"}:{}),readonly:true}}});
@@ -11,7 +11,9 @@ afterEach(()=>{__setManifestWriteFaultForTests(undefined);__resetDataPinForTests
 
 describe("MCP protocol",()=>{
  test("initialize ping and tools",async()=>{
+  expect(PLUGIN_VERSION).toBe("0.5.2");
   expect((await handle({jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"x"}}))?.result.serverInfo.name).toBe("sol-advisor");
+  expect((await handle({jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"x"}}))?.result.serverInfo.version).toBe(PLUGIN_VERSION);
   expect((await handle({jsonrpc:"2.0",id:10,method:"initialize",params:{protocolVersion:"unknown-future"}}))?.result.protocolVersion).toBe("2025-03-26");
   expect((await handle({jsonrpc:"2.0",id:2,method:"ping"}))?.result).toEqual({});
   expect((await handle({jsonrpc:"2.0",id:3,method:"tools/list"}))?.result.tools).toHaveLength(8);
@@ -45,6 +47,15 @@ describe("configuration",()=>{
   mkdirSync(data,{recursive:true});writeFileSync(join(data,"config.json"),"{");expect((await callTool("get_setup_status") as any).status).toBe("corrupt");
   writeFileSync(join(data,"config.json"),JSON.stringify({schemaVersion:0}));expect((await callTool("get_setup_status") as any).status).toBe("schema-old");
   await callTool("save_preferences",base());expect((await callTool("get_setup_status") as any).status).toBe("ready");
+ });
+ test("treats app-task state as compatibility metadata rather than lane opt-in",async()=>{
+  const saved:any=await callTool("save_preferences",base());
+  const omitted:any={...saved.preferences};delete omitted.appTaskLane;
+  expect(validatePreferences(omitted)).toEqual([]);
+  const enabled:any={...omitted,appTaskLane:{enabled:true,model:"gpt-5.6-luna",effort:"max"}};
+  expect(validatePreferences(enabled)).toEqual([]);
+  const invalid:any={...omitted,appTaskLane:{enabled:false,model:"gpt-5.6-luna",effort:"max"}};
+  expect(validatePreferences(invalid)).toContain("appTaskLane must be the exact enabled:true, model:gpt-5.6-luna, effort:max compatibility state when persisted; omission keeps the capability-gated default Codex app-task lane");
  });
  test("rejects secrets and creates update backup",async()=>{
   await expect(callTool("save_preferences",{...base(),roles:{...(base() as any).roles,advisor:{...(base() as any).roles.advisor,token:"SECRET2"}}})).rejects.toThrow("forbidden");
@@ -84,7 +95,7 @@ describe("configuration",()=>{
 
 describe("adapter rendering and lifecycle",()=>{
  test("renders every client and scope with deterministic exact paths",()=>{
-  for(const client of ["codex","cursor","vscode","github-copilot","kiro"]){for(const scope of ["project","user"]){const p:any=base(client,scope);p.workspace=realpathSync(workspace);p.schemaVersion=1;p.profileKey=`${client}:${scope}:${workspace}`;p.fallbackPolicy="fail-closed";p.fallbacks=[];p.createdAt=p.updatedAt="x";p.pluginVersion="0.5.0";const a=renderAdapter(p,workspace);expect(a.files).toHaveLength(3);expect(a.files.every(f=>f.content.includes("sol-advisor-managed:v1"))).toBe(true);if(client==="cursor")expect(a.warnings.join(" ")).toContain("may fall back");expect(renderAdapter(p,workspace).planDigest).toBe(a.planDigest);}}
+  for(const client of ["codex","cursor","vscode","github-copilot","kiro"]){for(const scope of ["project","user"]){const p:any=base(client,scope);p.workspace=realpathSync(workspace);p.schemaVersion=1;p.profileKey=`${client}:${scope}:${workspace}`;p.fallbackPolicy="fail-closed";p.fallbacks=[];p.createdAt=p.updatedAt="x";p.pluginVersion=PLUGIN_VERSION;const a=renderAdapter(p,workspace);expect(a.files).toHaveLength(3);expect(a.files.every(f=>f.content.includes("sol-advisor-managed:v1"))).toBe(true);if(client==="cursor")expect(a.warnings.join(" ")).toContain("may fall back");expect(renderAdapter(p,workspace).planDigest).toBe(a.planDigest);}}
  });
  test("requires exact consent, refuses conflict, backs up updates, and uninstalls exact files",async()=>{
   await callTool("save_preferences",base());const preview:any=await callTool("render_client_adapter",{workspace});

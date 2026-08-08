@@ -1,22 +1,22 @@
 ---
 name: orchestration
-description: "Configurable cross-client architect workflow that inherits the parent model, loads saved exact native role preferences, routes routine versus high-complexity implementation, preserves the separate opt-in Luna app-task lane, and keeps parent verification and acceptance."
+description: "Codex-native architect workflow with a gpt-5.6-sol / medium primary, default user-visible GPT-5.6 Luna / Max tasks through Codex app tools when available, leader-owned scheduling and same-task corrections, independent review and acceptance, layered PR dependency-graph execution, native Terra implementation and fresh Sol review contracts, and parent verification."
 ---
 
 # Sol Advisor Orchestration
 
-## Setup gate and inherited orchestrator
+## Setup gate and Sol / Medium orchestrator
 
 Before selecting a lane or delegating, call `get_setup_status`. If setup is missing,
 schema-old, or corrupt, run the `setup` skill as a multi-turn
 interview in this parent/main chat and stop orchestration until preferences validate.
 Load `get_preferences` on every invocation; do not rely on remembered defaults.
 
-The orchestrator always inherits the model and reasoning setting the user selected in
-the parent chat. Never block because the parent is not Sol / High, never change it,
-and never claim it was changed. Sol / High is a recommendation only. Exact native
-role model IDs and supported reasoning settings come from saved preferences. There is
-no silent fallback, translation, guessed role, or universal model enumeration.
+The primary orchestrator runs on `gpt-5.6-sol` with medium reasoning. Verify that
+runtime before execution or delegation; if it differs or is unobservable, stop and
+request Sol / Medium confirmation. Saved preferences may guide portable client roles,
+but cannot change the primary leader or the exact native role routing. There is no
+silent fallback, translation, guessed role, or universal model enumeration.
 
 Select the routine implementer for bounded mechanical changes, boilerplate, wiring,
 and fully specified work. Select the high-complexity implementer for security-sensitive
@@ -27,58 +27,72 @@ actual sandbox guarantee must be reported from client evidence, not inferred.
 
 On ChatGPT Work web, Kiro web/mobile, and skills-only surfaces without enforceable
 native role bindings, use the stored preferences as prompt guidance only and state
-that models, effort, and read-only isolation are not enforceable. The explicit Codex
-Luna / Max app-task lane remains separate and opt-in; never use it as fallback.
+that models, effort, and read-only isolation are not enforceable. The Codex Luna / Max
+app-task lane remains separate from native roles and, when all required app-task
+capabilities are available, is the default execution lane; never use it as fallback.
 
 Act as the architect. Own the user's intent, architecture, decomposition, complete
-task specification, parent verification, and final acceptance. The default native
-lane delegates implementation to Terra / High and requires a fresh Sol verdict. The
-explicit Luna task lane creates user-visible Codex app tasks at GPT-5.6 Luna / Max;
-the primary task monitors, reviews, corrects, authorizes PR creation, and orders
-dependent stacks. These lanes are distinct: the Luna lane is outside native subagent
-V2, never uses a Luna custom-agent TOML, and is never activated implicitly.
+task specification, parent verification, and final acceptance. The primary leader runs
+on `gpt-5.6-sol` with medium reasoning. When the Codex app task tools are available,
+the default execution mode is user-visible subthreads at `gpt-5.6-luna` with max
+reasoning. The primary task monitors, reviews, corrects, authorizes PR creation, and
+orders dependent stacks. For larger projects, build a PR dependency graph first, then
+execute parallel-ready graph nodes layer by layer as Luna Max subthreads. Each child
+reports its commits, diff, tests, and blockers before completing; the primary reviews
+actual code and evidence, submits accepted PRs, and starts the next dependent layer
+only after the current layer is accepted. Native execution and review model, effort,
+roles, isolation, and acceptance are decided by the current upstream Sol Advisor
+workflow. Preserve the native Terra implementer, fresh Sol reviewer, and their
+fail-closed runtime evidence gates; do not rename or repin those native agents. The
+Luna lane is outside native subagent V2 and never uses a Luna custom-agent TOML.
+
+When the Codex app-task capability gate is satisfied, the Sol leader owns scheduling
+and, by default, creates each Luna Max execution unit as an independent,
+subagent-like, user-visible task. The leader monitors each task, sends corrections to
+that same task, and independently reviews and accepts the corrected task before any
+PR creation or authorization. This is the normative Luna behavior; task creation is
+not delegated to a child and a failed correction never becomes a replacement task.
 
 Read [references/role-contracts.md](references/role-contracts.md) before the first
 native delegation in a session. Read the [Luna task-lane contract](references/luna-task-lane.md)
-before any explicitly authorized Luna task creation. Hosts other than Codex must first
-apply the [portable entry contract](references/portable-entry.md).
-
-## Portable entry contract
-
-Use only saved preferences and observable host capabilities. Codex, Cursor, VS Code,
-GitHub Copilot, and Kiro IDE/CLI may invoke the exact native role names generated by
-the confirmed adapter. Never translate model names or claim unavailable effort,
-cost-tier, or sandbox guarantees. If a configured role is absent or its requested
-model is unavailable, stop that lane without substitution.
-
-On prompt-only surfaces, keep architecture and specifications in the response and
-state that native bindings are unenforceable. See the portable reference for the
-capability matrix. Manifest conformance is not evidence of runtime behavior.
+before any Luna task creation. Hosts other than Codex must first apply the
+[portable entry contract](references/portable-entry.md).
 
 ## Confirm the primary session
 
-The primary session inherits the user's current model and reasoning setting. When
-metadata exposes them, report them without treating any particular value as a gate.
-Recommend Sol / High for current Codex use, but do not stop or claim a skill can alter
-the parent selection.
+Run the primary Codex session on `gpt-5.6-sol` with medium reasoning. Verify the
+current model and effort when runtime metadata exposes them. If either differs, tell
+the user to select Sol / Medium and stop before execution or delegation. If runtime
+metadata does not expose them, ask the user to confirm Sol / Medium and stop until
+confirmed. A skill cannot change the primary model itself; never assume or claim this
+prerequisite is satisfied. Plans have no global model or reasoning requirement: do not
+pin plan creation or execution to a model or effort from this skill.
 
 ## Choose a lane
 
-Use the configured native adapter by default when its exact three roles are
-observable. Invoke the exact generated frontmatter/native name: Codex uses
-`sol_advisor_routine`, `sol_advisor_high`, and `sol_advisor_advisor`; Cursor, VS Code,
-GitHub Copilot, and Kiro use `sol-advisor-routine`, `sol-advisor-high`, and
-`sol-advisor-advisor`. Never prescribe Codex identifiers cross-client. Role files,
-not per-spawn guesses, carry client-native model settings. Report routing or sandbox
-evidence only when exposed by the host.
+Use the Luna task lane as the default execution mode whenever the required Codex app
+task tools and accepted `gpt-5.6-luna` / max routing are available. If a required Luna
+capability is unavailable, stop that lane without silently substituting a model, effort,
+or agent. Native execution may be selected under the current upstream Sol Advisor
+workflow and must retain its own role, routing, isolation, acceptance, and evidence
+gates.
+
+## Portable entry contract
+
+Use only saved preferences and observable host capabilities on non-Codex hosts. Never
+translate model names or claim unavailable effort, cost-tier, or sandbox guarantees.
+On prompt-only surfaces, keep architecture and specifications in the response and
+state that native bindings are unenforceable. Manifest conformance is not evidence of
+runtime behavior.
 
 The retained exact Codex compatibility lane may still use its separately installed
 `sol_advisor_terra_implementer` and `sol_advisor_sol_reviewer` profiles and the legacy
 preflight below. Do not require those companions for configured cross-client roles.
 
-Activate the Luna task lane only when the user's current request explicitly says
-“Use the Luna task lane.” It uses Codex app task tools rather than a native agent file.
-If Luna / Max or a required app tool is unavailable, stop without fallback.
+Use the Luna task lane by default when its required Codex app-task tools and accepted
+Luna / Max routing are available. It uses Codex app task tools rather than a native
+agent file. If Luna / Max or a required app tool is unavailable, stop that lane
+without fallback; native execution remains available under its unchanged contract.
 
 ## Retained Codex compatibility preflight
 
@@ -161,8 +175,9 @@ patch or create a replacement task merely to avoid an unresolved correction.
 
 This section applies only to the explicitly retained exact Codex compatibility lane, not configured adapters. Use the same role for routine features, mechanical edits, difficult debugging,
 security-sensitive work, non-trivial algorithms, and broad refactors. There is no
-second native implementation or fallback lane. This section applies only when the
-user has not explicitly chosen the Luna task lane.
+second native implementation or fallback lane. This section applies when native
+execution is selected under the current upstream Sol Advisor workflow; it does not
+change the default Luna app-task routing when those tools are available.
 
 Spawn exactly:
 
@@ -185,13 +200,25 @@ Routing rules:
 - Give a failed lane a corrected specification; never repeat an unchanged prompt.
 - Never silently substitute a role, model, or reasoning level.
 
-## Route the explicit Luna task lane through Codex app tools
+## Route the default Luna task lane through Codex app tools
 
-The Luna lane is opt-in only and is not a native `spawn_agent` lane. The primary task
-must use `list_projects` before `create_thread`, select the project using its returned
+The Luna lane is the default user-visible execution mode when the app tools are
+available; it is not a native `spawn_agent` lane. The primary task must use
+`list_projects` before `create_thread`, select the project using its returned
 `projectId`, and inspect `isGitRepository`. For a Git project, create the child with
 the app's default isolated worktree; for a non-Git project, use the project's local
 environment. Do not assume an isolated worktree makes concurrent edits merge-safe.
+
+## Build the PR dependency graph for larger projects
+
+Before creating Luna children for a larger project, write a PR dependency graph. Each
+graph node must identify its owned files, starting base, dependencies, verification
+commands, and PR boundary. Group nodes into layers: run independent, non-overlapping
+nodes in the same layer concurrently as separate Luna Max subthreads, and serialize
+shared-file or dependent nodes. Every child must report its commit, complete diff,
+tests, and blockers before it completes. The primary reviews the actual code and
+evidence for every node, sends corrections to the same task when needed, and submits
+or authorizes each accepted PR before starting the next dependent layer.
 
 The child receives a complete packet because a new user-visible task does not inherit
 the parent's full context. Set `model` to `gpt-5.6-luna` and `thinking` to `max` in
@@ -216,9 +243,9 @@ read that same task again, then repeat primary diff inspection. The primary owns
 decomposition, dependency ordering, review, correction decisions, PR authorization,
 and final acceptance. A Luna child must not create or push a PR until the primary
 explicitly authorizes it after accepting the diff and checks. Create a dependent child
-only after the prior stack is accepted and its actual branch, commit, and PR state are
-recorded. Run independent, non-overlapping stacks concurrently; serialize shared-file
-and dependent stacks.
+only after the prior graph layer is accepted and its actual branch, commit, and PR
+state are recorded. Run independent, non-overlapping stacks concurrently; serialize
+shared-file and dependent stacks.
 
 Use the complete packet and branch rules in
 [references/luna-task-lane.md](references/luna-task-lane.md).
@@ -233,6 +260,28 @@ Treat worker reports as claims. Before acceptance:
 4. Compare the evidence with the objective, interfaces, and constraints.
 5. For the native lane, delegate corrections through Terra; for the Luna lane, send
    corrections back to the same task and re-review its updated evidence.
+
+## Close completed task graphs
+
+After every authorized graph node is accepted and its integration or PR state is
+recorded, inspect the actual task list and tell the user which completed node tasks
+are safe to archive. Include accepted nodes, completed correction tasks, and
+superseded attempts only when they have no unresolved correction, blocker, or
+dependent work. Report the exact task identities when available.
+
+Do not archive user-visible tasks merely because the graph is complete. Ask for or
+act on explicit user authorization first. Keep the primary leader task available by
+default because it owns the graph decisions, integration evidence, and final handoff;
+recommend archiving it only when the overall task itself is being retired or has a
+durable successor. State that task archival does not delete Git worktrees, branches,
+commits, or artifacts, and never remove those resources as an implied part of
+archival.
+
+When the user authorizes archival and the app exposes `set_thread_archived`, archive
+only the exact completed task identities and verify the resulting state with the app
+task tools. If the archive tool is unavailable or any target is ambiguous, leave that
+task unarchived and report the exact gap. This closure capability is optional until
+the user requests archival; its absence does not block implementation or acceptance.
 
 ## Consult fresh Sol at native commitment boundaries
 

@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export const CONFIG_SCHEMA_VERSION = 1;
+export const PLUGIN_VERSION = "0.5.2";
 export const MANAGED_MARKER = "sol-advisor-managed:v1";
 const previewPlans=new Map<string,{digest:string;expires:number;userToken?:string;used:boolean}>();
 let transactionFaultForTests:((point:string)=>void)|undefined;
@@ -91,7 +92,7 @@ export function validatePreferences(value: any): string[] {
   if (["vscode", "github-copilot", "kiro"].includes(value.client)) {
     for (const role of ["routine", "high", "advisor"] as RoleName[]) if (value.roles?.[role]?.effort !== undefined) errors.push(`${value.client} cannot persist a per-agent effort claim for ${role}`);
   }
-  if (value.appTaskLane !== undefined && (value.appTaskLane.enabled !== true || value.appTaskLane.model !== "gpt-5.6-luna" || value.appTaskLane.effort !== "max")) errors.push("appTaskLane is an explicit opt-in gpt-5.6-luna/max lane only");
+  if (value.appTaskLane !== undefined && (value.appTaskLane.enabled !== true || value.appTaskLane.model !== "gpt-5.6-luna" || value.appTaskLane.effort !== "max")) errors.push("appTaskLane must be the exact enabled:true, model:gpt-5.6-luna, effort:max compatibility state when persisted; omission keeps the capability-gated default Codex app-task lane");
   return errors;
 }
 function safeWorkspace(input: unknown): string {
@@ -239,7 +240,7 @@ function savePreferences(args:any) {
   for(const name of ["routine","high","advisor"] as RoleName[]) rejectUnknown(args.roles?.[name],["model","effort","readonly"],`role ${name}`);
   const now=new Date().toISOString(), existing=configState(), workspace=safeWorkspace(args.workspace);
   const profileKey=`${args.client}:${args.scope}:${workspace}`;
-  const candidate:any={schemaVersion:1,client:args.client,scope:args.scope,orchestrator:{model:"inherit",...(args.orchestrator?.recommendation?{recommendation:{model:args.orchestrator.recommendation.model,...(args.orchestrator.recommendation.effort!==undefined?{effort:args.orchestrator.recommendation.effort}:{})}}:{})},roles:{routine:{model:args.roles?.routine?.model,...(args.roles?.routine?.effort!==undefined?{effort:args.roles.routine.effort}:{}),...(args.roles?.routine?.readonly!==undefined?{readonly:args.roles.routine.readonly}:{})},high:{model:args.roles?.high?.model,...(args.roles?.high?.effort!==undefined?{effort:args.roles.high.effort}:{}),...(args.roles?.high?.readonly!==undefined?{readonly:args.roles.high.readonly}:{})},advisor:{model:args.roles?.advisor?.model,...(args.roles?.advisor?.effort!==undefined?{effort:args.roles.advisor.effort}:{}),readonly:true}},fallbackPolicy:"fail-closed",fallbacks:[],...(args.appTaskLane?.enabled===true?{appTaskLane:{enabled:true,model:"gpt-5.6-luna",effort:"max"}}:{}),profileKey,workspace,createdAt:existing.preferences?.profileKey===profileKey?existing.preferences.createdAt:now,updatedAt:now,pluginVersion:"0.5.0"};
+  const candidate:any={schemaVersion:1,client:args.client,scope:args.scope,orchestrator:{model:"inherit",...(args.orchestrator?.recommendation?{recommendation:{model:args.orchestrator.recommendation.model,...(args.orchestrator.recommendation.effort!==undefined?{effort:args.orchestrator.recommendation.effort}:{})}}:{})},roles:{routine:{model:args.roles?.routine?.model,...(args.roles?.routine?.effort!==undefined?{effort:args.roles.routine.effort}:{}),...(args.roles?.routine?.readonly!==undefined?{readonly:args.roles.routine.readonly}:{})},high:{model:args.roles?.high?.model,...(args.roles?.high?.effort!==undefined?{effort:args.roles.high.effort}:{}),...(args.roles?.high?.readonly!==undefined?{readonly:args.roles.high.readonly}:{})},advisor:{model:args.roles?.advisor?.model,...(args.roles?.advisor?.effort!==undefined?{effort:args.roles.advisor.effort}:{}),readonly:true}},fallbackPolicy:"fail-closed",fallbacks:[],...(args.appTaskLane?.enabled===true?{appTaskLane:{enabled:true,model:"gpt-5.6-luna",effort:"max"}}:{}),profileKey,workspace,createdAt:existing.preferences?.profileKey===profileKey?existing.preferences.createdAt:now,updatedAt:now,pluginVersion:PLUGIN_VERSION};
   const errors=validatePreferences(candidate); if(errors.length) throw new Error(errors.join("; "));
   if(existsSync(configPath())) { const privateBackups=backupDir(),backup=join(privateBackups,`${Date.now()}-config.json.bak`);if(dirname(backup)!==backupDir())throw new Error("config backup destination changed");copyFileSync(configPath(),backup);chmodSync(backup,0o600);syncFile(backup);syncDir(privateBackups); }
   let profiles:Record<string,Preferences>={}; try { const old:any=readJson(configPath()); if(old?.schemaVersion===1&&old.profiles&&typeof old.profiles==="object") profiles=old.profiles; } catch {}
@@ -279,7 +280,7 @@ export async function handle(message:any){
   const notification=!("id" in message);
   if(message.method==="notifications/initialized") return null;
   if(notification) return null;
-  if(message.method==="initialize") return response(message.id,{protocolVersion:"2025-03-26",capabilities:{tools:{}},serverInfo:{name:"sol-advisor",version:"0.5.0"}});
+  if(message.method==="initialize") return response(message.id,{protocolVersion:"2025-03-26",capabilities:{tools:{}},serverInfo:{name:"sol-advisor",version:PLUGIN_VERSION}});
   if(message.method==="ping") return response(message.id,{});
   if(message.method==="tools/list") return response(message.id,{tools});
   if(message.method==="tools/call") {
