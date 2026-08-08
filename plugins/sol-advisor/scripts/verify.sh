@@ -14,6 +14,12 @@ installer=$script_dir/install-agents.sh
 runtime_inspector=$script_dir/inspect-agent-runtime.sh
 templates=$plugin_dir/agents
 manifest=$plugin_dir/.codex-plugin/plugin.json
+canonical_manifest=$plugin_dir/plugin.json
+package_manifest=$repo_dir/package.json
+mcp_server=$plugin_dir/mcp/server.ts
+mcp_test=$plugin_dir/mcp/server.test.ts
+changelog=$repo_dir/CHANGELOG.md
+setup_skill=$plugin_dir/skills/setup/SKILL.md
 skill=$plugin_dir/skills/orchestration/SKILL.md
 contracts=$plugin_dir/skills/orchestration/references/role-contracts.md
 luna_contract=$plugin_dir/skills/orchestration/references/luna-task-lane.md
@@ -102,7 +108,7 @@ LEGACY_LUNA
   [ "$(shasum -a 256 "$target/$luna_file" | awk '{print $1}')" = "$legacy_luna_sha256" ] || fail "legacy Luna fixture digest drifted"
 }
 
-for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contracts" "$luna_contract" "$readme" "$ui"; do
+for required in "$installer" "$runtime_inspector" "$manifest" "$canonical_manifest" "$package_manifest" "$mcp_server" "$mcp_test" "$changelog" "$setup_skill" "$skill" "$contracts" "$luna_contract" "$readme" "$ui"; do
   test -f "$required" || fail "required file missing: $required"
 done
 
@@ -115,8 +121,8 @@ import sys
 
 path = Path(sys.argv[1])
 data = json.loads(path.read_text(encoding="utf-8"))
-if data.get("version") != "0.5.1":
-    raise SystemExit(f"manifest version is {data.get('version')!r}, expected '0.5.1'")
+if data.get("version") != "0.5.2":
+    raise SystemExit(f"manifest version is {data.get('version')!r}, expected '0.5.2'")
 
 interface = data.get("interface")
 if not isinstance(interface, dict):
@@ -200,7 +206,93 @@ for label, pattern in stale.items():
     if re.search(pattern, surface):
         raise SystemExit(f"manifest still claims {label}")
 PY
-pass "manifest JSON, version 0.5.1, integrated policy metadata, non-blank defaultPrompt entries, and 128-character cap"
+pass "manifest JSON, version 0.5.2, integrated policy metadata, non-blank defaultPrompt entries, and 128-character cap"
+
+python3 - "$manifest" "$canonical_manifest" "$package_manifest" "$mcp_server" "$mcp_test" "$changelog" <<'PY'
+from pathlib import Path
+import json
+import re
+import sys
+
+codex_manifest, canonical_manifest, package_manifest, mcp_server, mcp_test, changelog = map(Path, sys.argv[1:])
+expected = "0.5.2"
+
+for path in (codex_manifest, canonical_manifest, package_manifest):
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("version") != expected:
+        raise SystemExit(f"{path}: version is {data.get('version')!r}, expected {expected!r}")
+
+canonical = json.loads(canonical_manifest.read_text(encoding="utf-8"))
+description = canonical.get("description", "").lower()
+for marker in ("default", "independent", "luna", "leader", "creates", "monitors", "reviews", "accepts"):
+    if marker not in description:
+        raise SystemExit(f"{canonical_manifest}: description omits {marker!r} from the default Luna task contract")
+if re.search(r"explicit(?:ly)?\s+opt[- ]?in", description):
+    raise SystemExit(f"{canonical_manifest}: description still claims explicit Luna opt-in")
+
+server_text = mcp_server.read_text(encoding="utf-8")
+for marker in (
+    'export const PLUGIN_VERSION = "0.5.2";',
+    "pluginVersion:PLUGIN_VERSION",
+    "version:PLUGIN_VERSION",
+):
+    if marker not in server_text:
+        raise SystemExit(f"{mcp_server}: missing runtime version surface {marker!r}")
+
+test_text = mcp_test.read_text(encoding="utf-8")
+for marker in ('PLUGIN_VERSION', 'toBe("0.5.2")'):
+    if marker not in test_text:
+        raise SystemExit(f"{mcp_test}: missing 0.5.2 runtime assertion {marker!r}")
+
+changelog_text = changelog.read_text(encoding="utf-8")
+if not re.search(r"^## \[0\.5\.2\] - 2026-08-08$", changelog_text, re.MULTILINE):
+    raise SystemExit(f"{changelog}: missing dated 0.5.2 entry")
+if "[Unreleased]: https://github.com/DannyMac180/sol-advisor/compare/v0.5.2...HEAD" not in changelog_text:
+    raise SystemExit(f"{changelog}: Unreleased compare link is not based on v0.5.2")
+if "[0.5.2]: https://github.com/DannyMac180/sol-advisor/compare/v0.5.0...HEAD" not in changelog_text:
+    raise SystemExit(f"{changelog}: 0.5.2 compare link is missing or stale")
+if "releases/tag/v0.5.2" in changelog_text:
+    raise SystemExit(f"{changelog}: 0.5.2 must not claim a release tag exists")
+PY
+pass "0.5.2 parity across both manifests, package metadata, MCP runtime/tests, and changelog"
+
+python3 - "$setup_skill" "$mcp_server" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+setup, runtime = map(Path, sys.argv[1:])
+compact = lambda path: re.sub(r"\s+", " ", path.read_text(encoding="utf-8").lower())
+setup_text, runtime_text = compact(setup), compact(runtime)
+
+setup_required = {
+    "default capability-gated app lane": r"capability gate.{0,120}default",
+    "Luna / Max": r"luna.{0,20}max",
+    "user-visible lane": r"user-visible",
+    "no separate lane opt-in": r"no separate lane opt[- ]?in|do not ask for a separate lane opt[- ]?in",
+    "outside native roles": r"outside the native roles",
+    "not a fallback": r"never a fallback",
+    "portable inherit storage": r'orchestrator\.model=\\?"inherit\\?"',
+    "live Sol / Medium requirement": r"gpt-5\.6-sol.{0,80}medium|medium.{0,80}gpt-5\.6-sol",
+    "omission compatibility rule": r"omitting it does not disable",
+}
+for label, pattern in setup_required.items():
+    if not re.search(pattern, setup_text):
+        raise SystemExit(f"{setup}: missing {label}")
+for label, pattern in {
+    "stale explicit opt-in wording": r"(?:luna.{0,120}explicit opt[- ]?in|explicit opt[- ]?in.{0,120}luna)",
+    "stale Sol / High recommendation": r"recommend selecting sol / high|orchestrator.{0,80}sol / high",
+}.items():
+    if re.search(pattern, setup_text):
+        raise SystemExit(f"{setup}: still contains {label}")
+
+runtime_required = r"apptasklane must be the exact enabled:true, model:gpt-5\.6-luna, effort:max compatibility state when persisted; omission keeps the capability-gated default codex app-task lane"
+if not re.search(runtime_required, runtime_text):
+    raise SystemExit(f"{runtime}: missing compatibility wording for persisted appTaskLane")
+if re.search(r"apptasklane.{0,100}explicit opt[- ]?in|explicit opt[- ]?in.{0,100}apptasklane", runtime_text):
+    raise SystemExit(f"{runtime}: still contains stale explicit opt-in wording")
+PY
+pass "setup default Luna compatibility, Sol/Medium live-primary guidance, and MCP stale-claim guards"
 
 python3 - "$templates" <<'PY'
 from pathlib import Path
@@ -375,6 +467,14 @@ for tool in list_projects list_threads create_thread wait_threads read_thread se
 done
 grep -Fq 'gpt-5.6-luna' "$skill" || fail "skill omits Luna model"
 grep -Fq 'thinking` to `max' "$skill" || fail "skill omits Luna Max routing"
+grep -Fq 'owns scheduling' "$skill" || fail "skill omits Sol leader scheduling ownership"
+grep -Fq 'creates each Luna Max execution unit as an independent' "$skill" || fail "skill omits independent Luna execution-unit creation"
+grep -Fq 'monitors each task' "$skill" || fail "skill omits Luna task monitoring ownership"
+grep -Fq 'sends corrections to' "$skill" || fail "skill omits correction routing"
+grep -Fq 'same task' "$skill" || fail "skill omits same-task correction rule"
+grep -Fq 'independently reviews and accepts' "$skill" || fail "skill omits leader review and acceptance"
+grep -Fq 'native Terra implementer' "$skill" || fail "skill omits native Terra lane"
+grep -Fq 'fresh Sol reviewer' "$skill" || fail "skill omits fresh Sol native review lane"
 grep -Fq 'isGitRepository' "$luna_contract" || fail "Luna contract omits Git-project check"
 grep -Fq 'isolated worktree environment' "$luna_contract" || fail "Luna contract omits Git worktree default"
 grep -Fq 'clientThreadId' "$luna_contract" || fail "Luna contract omits setup-pending identity guard"

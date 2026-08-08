@@ -6,6 +6,12 @@ subagent-like, separate user-visible Codex thread created and monitored by the S
 orchestrator. The primary leader runs on `gpt-5.6-sol` with medium reasoning and
 remains the architect, reviewer, correction owner, PR authority, and final acceptor.
 
+This leader contract is normative: when the app-task capability gate is satisfied,
+the Sol leader schedules by creating each Luna Max execution unit as an independent,
+subagent-like, user-visible task. The leader monitors each task, sends corrections to
+that same task, and independently reviews and accepts it before PR authorization. A
+correction stays in the original task and never becomes a replacement task.
+
 ## Scope and routing
 
 - Use this lane as the default execution mode whenever the required Codex app task

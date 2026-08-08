@@ -1,9 +1,35 @@
 ---
 name: orchestration
-description: "Codex-native architect and delegation workflow with a gpt-5.6-sol / medium primary, default user-visible GPT-5.6 Luna / Max subthreads through Codex app tools when available, layered PR dependency-graph execution for larger projects, native Terra implementation and fresh Sol review contracts, and parent verification and acceptance."
+description: "Codex-native architect workflow with a gpt-5.6-sol / medium primary, default user-visible GPT-5.6 Luna / Max tasks through Codex app tools when available, leader-owned scheduling and same-task corrections, independent review and acceptance, layered PR dependency-graph execution, native Terra implementation and fresh Sol review contracts, and parent verification."
 ---
 
 # Sol Advisor Orchestration
+
+## Setup gate and Sol / Medium orchestrator
+
+Before selecting a lane or delegating, call `get_setup_status`. If setup is missing,
+schema-old, or corrupt, run the `setup` skill as a multi-turn
+interview in this parent/main chat and stop orchestration until preferences validate.
+Load `get_preferences` on every invocation; do not rely on remembered defaults.
+
+The primary orchestrator runs on `gpt-5.6-sol` with medium reasoning. Verify that
+runtime before execution or delegation; if it differs or is unobservable, stop and
+request Sol / Medium confirmation. Saved preferences may guide portable client roles,
+but cannot change the primary leader or the exact native role routing. There is no
+silent fallback, translation, guessed role, or universal model enumeration.
+
+Select the routine implementer for bounded mechanical changes, boilerplate, wiring,
+and fully specified work. Select the high-complexity implementer for security-sensitive
+logic, concurrency, non-trivial algorithms, difficult debugging, migrations, or
+wide-blast-radius refactors. Invoke the exact installed native role names produced by
+the confirmed client adapter. The advisor remains behaviorally read-only and its
+actual sandbox guarantee must be reported from client evidence, not inferred.
+
+On ChatGPT Work web, Kiro web/mobile, and skills-only surfaces without enforceable
+native role bindings, use the stored preferences as prompt guidance only and state
+that models, effort, and read-only isolation are not enforceable. The Codex Luna / Max
+app-task lane remains separate from native roles and, when all required app-task
+capabilities are available, is the default execution lane; never use it as fallback.
 
 Act as the architect. Own the user's intent, architecture, decomposition, complete
 task specification, parent verification, and final acceptance. The primary leader runs
@@ -20,9 +46,17 @@ workflow. Preserve the native Terra implementer, fresh Sol reviewer, and their
 fail-closed runtime evidence gates; do not rename or repin those native agents. The
 Luna lane is outside native subagent V2 and never uses a Luna custom-agent TOML.
 
+When the Codex app-task capability gate is satisfied, the Sol leader owns scheduling
+and, by default, creates each Luna Max execution unit as an independent,
+subagent-like, user-visible task. The leader monitors each task, sends corrections to
+that same task, and independently reviews and accepts the corrected task before any
+PR creation or authorization. This is the normative Luna behavior; task creation is
+not delegated to a child and a failed correction never becomes a replacement task.
+
 Read [references/role-contracts.md](references/role-contracts.md) before the first
 native delegation in a session. Read the [Luna task-lane contract](references/luna-task-lane.md)
-before any Luna task creation.
+before any Luna task creation. Hosts other than Codex must first apply the
+[portable entry contract](references/portable-entry.md).
 
 ## Confirm the primary session
 
@@ -43,15 +77,24 @@ or agent. Native execution may be selected under the current upstream Sol Adviso
 workflow and must retain its own role, routing, isolation, acceptance, and evidence
 gates.
 
-The Luna lane is implemented through Codex app task tools, not native subagent V2.
-Its required tools are `list_projects`, `list_threads`, `create_thread`,
-`wait_threads`, `read_thread`, and `send_message_to_thread`.
-Never use `spawn_agent` for a Luna task and never install or require a Luna companion
-TOML. Follow [the complete Luna task-lane contract](references/luna-task-lane.md),
-including the task packet, project/worktree selection, monitoring, same-task
-corrections, git/PR boundary, and dependent-stack ordering.
+## Portable entry contract
 
-## Preflight the native companion custom agents
+Use only saved preferences and observable host capabilities on non-Codex hosts. Never
+translate model names or claim unavailable effort, cost-tier, or sandbox guarantees.
+On prompt-only surfaces, keep architecture and specifications in the response and
+state that native bindings are unenforceable. Manifest conformance is not evidence of
+runtime behavior.
+
+The retained exact Codex compatibility lane may still use its separately installed
+`sol_advisor_terra_implementer` and `sol_advisor_sol_reviewer` profiles and the legacy
+preflight below. Do not require those companions for configured cross-client roles.
+
+Use the Luna task lane by default when its required Codex app-task tools and accepted
+Luna / Max routing are available. It uses Codex app task tools rather than a native
+agent file. If Luna / Max or a required app tool is unavailable, stop that lane
+without fallback; native execution remains available under its unchanged contract.
+
+## Retained Codex compatibility preflight
 
 The two role files are user-owned native custom-agent TOML files. Installing or
 updating the plugin does not automatically register them. Install them separately and
@@ -128,9 +171,9 @@ is wrong, correct the specification and delegate the fix. If the Luna result is 
 send a precise correction back to the same task. Do not silently repair a failed child
 patch or create a replacement task merely to avoid an unresolved correction.
 
-## Route native implementation through Terra / High
+## Retained Codex native implementation through Terra / High
 
-Use the same role for routine features, mechanical edits, difficult debugging,
+This section applies only to the explicitly retained exact Codex compatibility lane, not configured adapters. Use the same role for routine features, mechanical edits, difficult debugging,
 security-sensitive work, non-trivial algorithms, and broad refactors. There is no
 second native implementation or fallback lane. This section applies when native
 execution is selected under the current upstream Sol Advisor workflow; it does not

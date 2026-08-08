@@ -1,21 +1,36 @@
 {
   "name": "sol-advisor",
-  "version": "0.5.1",
-  "description": "Codex-native architect workflow with a gpt-5.6-sol / medium primary, default user-visible GPT-5.6 Luna / Max subthreads through Codex app tools when available, layered PR dependency-graph execution, primary-session verification and acceptance, and an explicit post-completion prompt for safely archiving finished node tasks; native execution and review remain governed by Sol Advisor's current shipped workflow.",
-  "author": {"name": "Daniel McAteer", "url": "https://github.com/DannyMac180"},
+  "version": "0.5.2",
+  "description": "Codex-native architect workflow with a gpt-5.6-sol / medium primary, default user-visible GPT-5.6 Luna / Max tasks through Codex app tools when available, leader-owned scheduling, correction, review, and acceptance, layered PR dependency-graph execution, and retained native Terra/fresh Sol review compatibility.",
+  "author": {
+    "name": "Daniel McAteer",
+    "url": "https://github.com/DannyMac180"
+  },
   "homepage": "https://github.com/DannyMac180/sol-advisor#readme",
   "repository": "https://github.com/DannyMac180/sol-advisor",
   "license": "MIT",
-  "keywords": ["codex", "orchestration", "multi-agent", "gpt-5.6"],
+  "keywords": [
+    "codex",
+    "orchestration",
+    "multi-agent",
+    "gpt-5.6"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Sol Advisor",
-    "shortDescription": "Run Sol / Medium with monitored Luna Max threads, verify and accept each layer, then identify completed node tasks that are safe to archive.",
-    "longDescription": "Sol Advisor keeps architecture, decomposition, verification, layer acceptance, and the final decision in the primary gpt-5.6-sol / medium session. Plans have no plugin/global model or effort pin. When Codex app task tools and accepted GPT-5.6 Luna / Max routing are available, Sol creates and monitors each Luna Max child as a subagent-like, separate user-visible thread through list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread. Larger projects first record a PR dependency graph, then execute independent nodes in parallel by layer; each child reports its commit, diff, tests, and blockers, and Sol reviews, corrects, and submits or authorizes each accepted PR before the next dependent stack. After the authorized graph is accepted and integrated, Sol tells the user which completed node tasks can be archived safely, waits for explicit authorization, keeps the leader by default, and distinguishes task archival from worktree deletion. Native execution and review routing remain governed by the current shipped Sol Advisor workflow and its exact companion roles sol_advisor_terra_implementer and sol_advisor_sol_reviewer.",
+    "shortDescription": "Run Sol / Medium with default monitored Luna Max tasks, leader-owned review and acceptance, and native Terra/Sol compatibility.",
+    "longDescription": "Sol Advisor keeps architecture, decomposition, scheduling, verification, layer acceptance, and the final decision in the primary gpt-5.6-sol / medium session. Plans have no plugin/global model or effort pin. When Codex app task tools and accepted GPT-5.6 Luna / Max routing are available, Sol creates each Luna Max execution unit as an independent, subagent-like, separate user-visible task through list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread; it monitors it, sends corrections to that same task, and independently reviews and accepts its diff before PR authorization. Larger projects first record a PR dependency graph, then execute independent nodes in parallel by layer; each child reports its commit, diff, tests, and blockers, and Sol orders each dependent stack only after acceptance before the next dependent stack begins. After the authorized graph is accepted and integrated, Sol tells the user which completed node tasks are safe to archive, waits for explicit authorization, keeps the leader by default, and distinguishes task archival from worktree deletion. Native execution and review routing remain governed by the current shipped Sol Advisor workflow and its exact companion roles sol_advisor_terra_implementer and sol_advisor_sol_reviewer.",
     "developerName": "Daniel McAteer",
     "category": "Productivity",
-    "capabilities": ["Interactive", "Write"],
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
     "websiteURL": "https://github.com/DannyMac180/sol-advisor",
-    "defaultPrompt": ["Use Sol Advisor's gpt-5.6-sol / medium primary and default monitored Luna Max route; verify and accept the diff.", "For larger work, create a layered PR graph; require each child's commit, diff, tests, and blockers before acceptance.", "After graph completion, identify safe tasks; archive only with explicit authorization; retain leader and Git resources."]
+    "defaultPrompt": [
+      "Use Sol / Medium; when Luna Max app-task capabilities are available, create and monitor each user-visible Luna task.",
+      "Send corrections to the same Luna task, then independently review and accept its diff before PR authorization.",
+      "Keep the native Terra implementer and fresh Sol reviewer lane available with its existing routing."
+    ]
   }
 }
