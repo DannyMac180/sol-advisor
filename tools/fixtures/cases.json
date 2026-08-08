@@ -1,0 +1,60 @@
+{
+  "positive": [
+    "positive-manifest.json",
+    "positive-dotted-name.json"
+  ],
+  "negative": [
+    "negative-unknown-field.json",
+    "negative-author-field.json",
+    "negative-double-hyphen-name.json",
+    "negative-double-period-name.json",
+    "negative-long-name.json"
+  ],
+  "positiveLinks": [
+    "positive-links.md"
+  ],
+  "negativeLinks": [
+    "negative-traversal.md",
+    "negative-case.md",
+    "negative-broken.md",
+    "negative-absolute.md"
+  ],
+  "releaseTags": {
+    "positive": [
+      {
+        "tag": "v1.2.3",
+        "versions": [
+          "1.2.3",
+          "1.2.3",
+          "1.2.3"
+        ]
+      }
+    ],
+    "negative": [
+      {
+        "tag": "1.2.3",
+        "versions": [
+          "1.2.3"
+        ]
+      },
+      {
+        "tag": "v1.2.3",
+        "versions": [
+          "1.2.4"
+        ]
+      },
+      {
+        "tag": "v1.2",
+        "versions": [
+          "1.2.0"
+        ]
+      },
+      {
+        "tag": "v1.2.3-beta.1",
+        "versions": [
+          "1.2.3-beta.1"
+        ]
+      }
+    ]
+  }
+}

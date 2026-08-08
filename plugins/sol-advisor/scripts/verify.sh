@@ -424,8 +424,8 @@ for document in "$readme" "$manifest" "$skill" "$contracts" "$deepseek_contract"
 done
 forbidden_terra='sol_advisor_terra_'"max"
 forbidden_file='sol-advisor-terra-'"max"
-if rg -n "$forbidden_terra|$forbidden_file" "$readme" "$plugin_dir"; then fail "forbidden second Terra role remains"; fi
-pass "native DeepSeek/Terra/Sol and Luna contracts, fallback guards, and stale-claim checks"
+if grep -ERn "$forbidden_terra|$forbidden_file" "$readme" "$plugin_dir"; then fail "forbidden second Terra role remains"; fi
+pass "native DeepSeek/Terra/Sol and Luna contracts, opt-in guards, fallback guards, and stale-claim checks"
 
 sh -n "$installer"
 sh -n "$runtime_inspector"
