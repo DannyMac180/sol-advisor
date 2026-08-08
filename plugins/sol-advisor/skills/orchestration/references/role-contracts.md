@@ -4,6 +4,8 @@ Use these contracts with Sol Advisor's namespaced, role-pinned native custom age
 They do not launch a nested Codex CLI or change global default-subagent routing. The
 separate [Luna task-lane contract](luna-task-lane.md) covers user-visible app tasks;
 it is not a native custom-agent role and must not be represented by a companion TOML.
+The [DeepSeek native-lane contract](deepseek-native-lane.md) defines capability gates
+and the only permitted automatic pre-work fallback.
 Adapt every placeholder without removing a required field.
 
 ## Required preflight
@@ -11,22 +13,27 @@ Adapt every placeholder without removing a required field.
 Before every native spawn, complete steps 1-2 of SKILL.md's preflight. After spawning,
 complete steps 3-4 before accepting the result:
 
-1. Require the non-mutating companion check to prove both installed files exactly
+1. Require the non-mutating companion check to prove all three installed files exactly
    match current templates and the retired companion file is absent.
-2. Require native exposure of exactly `sol_advisor_terra_implementer` and
-   `sol_advisor_sol_reviewer`.
+2. Require native exposure of `sol_advisor_terra_implementer` and
+   `sol_advisor_sol_reviewer`. Record `sol_advisor_deepseek_implementer` separately:
+   its absence disables DeepSeek but does not block Terra unless the user explicitly
+   required DeepSeek.
 3. Observe the selected role, model, and effort through public spawn/details metadata
    first, using the local runtime inspector only for omitted fields. Accept only
-   Terra / High for implementation and Sol / High for review.
+   Terra / High or `deepseek/deepseek-v4-flash` / High for implementation and Sol /
+   High for review.
 4. For the reviewer, capture actual sandbox policy and permission profile types.
 
 A missing, stale, unsafe, conflicting, unavailable, inconsistent, or unobservable
-role/model/effort stops the native lane. Never silently fall back. Model and effort are
-pinned by custom-agent TOML, so omit native per-spawn overrides.
+role/model/effort stops the native lane. Never silently fall back. The only permitted
+automatic fallback is the DeepSeek contract's explicit, reported selection of Terra
+after a clear routing failure before worker implementation begins. Model and effort
+are pinned by custom-agent TOML, so omit native per-spawn overrides.
 
 ## Shared implementation contract
 
-Every Terra prompt must contain all five sections:
+Every native implementation prompt must contain all five sections:
 
 ~~~text
 OBJECTIVE
@@ -102,11 +109,38 @@ concurrent; shared-file and dependent stacks are serial. Worktree isolation alon
 not merge safety, and “report back” means explicit primary monitoring/read, not an
 automatic callback.
 
-## Terra / High - sole native implementation lane
+## DeepSeek V4 Flash / High - capability-gated native implementation lane
 
-Use this lane for every delegated native implementation, from routine edits through
-complex, security-sensitive, context-heavy, and broad work. It is not the Luna
-task-lane implementation path.
+Read [deepseek-native-lane.md](deepseek-native-lane.md) before selecting this role.
+Use it only when explicitly requested or when automatic native selection satisfies its
+capability gate. It is not the Luna task-lane implementation path.
+
+Spawn exactly:
+
+~~~text
+agent_type: sol_advisor_deepseek_implementer
+fork_turns: none
+~~~
+
+The installed role pins `deepseek/deepseek-v4-flash` at high reasoning. Do not attach
+per-spawn model or reasoning fields. Require public-details-first runtime observation
+of the exact role and pin before accepting its report.
+
+Prompt:
+
+~~~text
+ROLE
+Act as Sol Advisor's DeepSeek implementation worker. Resolve the supplied specification
+within the settled architecture, preserve every stated interface and constraint, and
+surface ambiguity instead of redesigning the architecture.
+
+<paste and complete the Shared implementation contract>
+~~~
+
+## Terra / High - reliable native implementation lane
+
+Use this lane when explicitly requested, when DeepSeek is not selected, or after the
+DeepSeek contract permits a reported pre-work automatic fallback.
 
 Spawn exactly:
 
@@ -123,7 +157,7 @@ Prompt:
 
 ~~~text
 ROLE
-Act as Sol Advisor's sole implementation worker. Resolve the supplied specification
+Act as Sol Advisor's Terra implementation worker. Resolve the supplied specification
 within the settled architecture, preserve every stated interface and constraint, and
 surface ambiguity instead of redesigning the architecture.
 

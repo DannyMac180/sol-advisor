@@ -1,5 +1,5 @@
 #!/bin/sh
-# Repository-local verification for Sol Advisor's two-role companion migration.
+# Repository-local verification for Sol Advisor's three-role companion migration.
 
 set -eu
 
@@ -15,6 +15,7 @@ templates=$plugin_dir/agents
 manifest=$plugin_dir/.codex-plugin/plugin.json
 skill=$plugin_dir/skills/orchestration/SKILL.md
 contracts=$plugin_dir/skills/orchestration/references/role-contracts.md
+deepseek_contract=$plugin_dir/skills/orchestration/references/deepseek-native-lane.md
 luna_contract=$plugin_dir/skills/orchestration/references/luna-task-lane.md
 readme=$repo_dir/README.md
 ui=$plugin_dir/skills/orchestration/agents/openai.yaml
@@ -34,10 +35,12 @@ trap cleanup 0 HUP INT TERM
 tmp_dir=$(mktemp -d "$tmp_base/sol-advisor-verify.XXXXXX") || fail "could not create disposable verification directory"
 
 terra_file=sol-advisor-terra-implementer.toml
+deepseek_file=sol-advisor-deepseek-implementer.toml
 sol_file=sol-advisor-sol-reviewer.toml
 luna_file=sol-advisor-luna-implementer.toml
 legacy_terra_sha256=4425a8c1f21ce8c6af93f96adc253bbc33ea301f1389b3fa8ce350be08584eca
 legacy_luna_sha256=fba1b42849d93737e83b094a2ab0b1611f87ac37db7438c8bbdf581f0813f8eb
+legacy_terra_v04_sha256=06c318e5e93f37452635906394e6ea69fb6a65ba9e6ad7172d37b444e0dc871d
 
 snapshot_files() {
   target=$1
@@ -101,17 +104,43 @@ LEGACY_LUNA
   [ "$(shasum -a 256 "$target/$luna_file" | awk '{print $1}')" = "$legacy_luna_sha256" ] || fail "legacy Luna fixture digest drifted"
 }
 
-for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contracts" "$luna_contract" "$readme" "$ui"; do
+write_v04_terra() {
+  target=$1
+  mkdir -p "$target"
+  cat > "$target/$terra_file" <<'LEGACY_TERRA_V04'
+name = "sol_advisor_terra_implementer"
+description = "Sol Advisor's sole implementation lane for routine and complex work."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
+
+developer_instructions = """
+You are Sol Advisor's sole implementation worker for routine, context-heavy,
+higher-risk, and wider-blast-radius work. Execute the supplied five-part specification
+within the settled architecture. Preserve every stated interface and constraint, stay
+within the owned file set, and document material judgment calls.
+
+You are not alone in the codebase: preserve concurrent edits and do not revert
+unrelated work. Surface ambiguity, scope conflicts, or verification failures rather
+than redesigning the architecture without direction. Run the requested checks and
+report actual evidence. Do not silently substitute a different role, model, or
+reasoning level; this installed custom-agent profile is the only implementation lane.
+"""
+LEGACY_TERRA_V04
+  [ "$(shasum -a 256 "$target/$terra_file" | awk '{print $1}')" = "$legacy_terra_v04_sha256" ] || fail "legacy v0.4 Terra fixture digest drifted"
+}
+
+for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contracts" "$deepseek_contract" "$luna_contract" "$readme" "$ui"; do
   test -f "$required" || fail "required file missing: $required"
 done
 
 jq empty "$manifest"
 [ "$(jq -r '.version' "$manifest")" = 0.5.0 ] || fail "manifest version is not 0.5.0"
+grep -Fq 'deepseek/deepseek-v4-flash' "$manifest" || fail "manifest does not describe DeepSeek routing"
 grep -Fq 'explicit opt-in' "$manifest" || fail "manifest does not describe explicit Luna opt-in"
 grep -Fqi 'GPT-5.6 Luna' "$manifest" || fail "manifest does not describe Luna routing"
 grep -Fq 'Codex app task tools' "$manifest" || fail "manifest does not describe app-task routing"
 grep -Fq 'fresh Sol' "$manifest" || fail "manifest does not preserve native fresh Sol review"
-pass "manifest JSON, version, and both-mode UI language"
+pass "manifest JSON, version, and native/Luna UI language"
 
 python3 - "$templates" <<'PY'
 from pathlib import Path
@@ -122,6 +151,11 @@ expected = {
     "sol-advisor-terra-implementer.toml": {
         "name": "sol_advisor_terra_implementer",
         "model": "gpt-5.6-terra",
+        "model_reasoning_effort": "high",
+    },
+    "sol-advisor-deepseek-implementer.toml": {
+        "name": "sol_advisor_deepseek_implementer",
+        "model": "deepseek/deepseek-v4-flash",
         "model_reasoning_effort": "high",
     },
     "sol-advisor-sol-reviewer.toml": {
@@ -142,17 +176,31 @@ for filename, pins in expected.items():
     for field, value in pins.items():
         if data.get(field) != value:
             raise SystemExit(f"{filename}: {field}={data.get(field)!r}, expected {value!r}")
-print("two exact role pins are valid")
+print("three exact role pins are valid")
 PY
-pass "exact two-role TOML inventory"
+pass "exact three-role TOML inventory"
 
 grep -Fq "legacy_terra_sha256=$legacy_terra_sha256" "$installer" || fail "installer legacy Terra digest mismatch"
 grep -Fq "legacy_luna_sha256=$legacy_luna_sha256" "$installer" || fail "installer legacy Luna digest mismatch"
-pass "immutable v0.2.0 migration fingerprints"
+grep -Fq "legacy_terra_v04_sha256=$legacy_terra_v04_sha256" "$installer" || fail "installer legacy v0.4 Terra digest mismatch"
+pass "immutable legacy migration fingerprints"
+
+python3 - "$manifest" <<'PY'
+import json
+import sys
+
+data = json.loads(open(sys.argv[1], encoding="utf-8").read())
+prompts = data.get("interface", {}).get("defaultPrompt")
+if not isinstance(prompts, list) or not prompts or any(not isinstance(prompt, str) or len(prompt) > 128 for prompt in prompts):
+    raise SystemExit(f"defaultPrompt entries must be non-empty strings of at most 128 characters: {prompts!r}")
+print("default prompts fit the 128-character cap")
+PY
+pass "default prompt length cap"
 
 clean_target=$tmp_dir/clean
 sh "$installer" --target-dir "$clean_target"
 cmp -s "$templates/$terra_file" "$clean_target/$terra_file" || fail "clean Terra install mismatch"
+cmp -s "$templates/$deepseek_file" "$clean_target/$deepseek_file" || fail "clean DeepSeek install mismatch"
 cmp -s "$templates/$sol_file" "$clean_target/$sol_file" || fail "clean Sol install mismatch"
 test ! -e "$clean_target/$luna_file" || fail "clean install created retired Luna role"
 sh "$installer" --target-dir "$clean_target" --check
@@ -170,22 +218,34 @@ pass "missing-target check refusal is non-mutating"
 codex_home=$tmp_dir/codex-home
 CODEX_HOME="$codex_home" sh "$installer"
 cmp -s "$templates/$terra_file" "$codex_home/agents/$terra_file" || fail "CODEX_HOME Terra mismatch"
+cmp -s "$templates/$deepseek_file" "$codex_home/agents/$deepseek_file" || fail "CODEX_HOME DeepSeek mismatch"
 cmp -s "$templates/$sol_file" "$codex_home/agents/$sol_file" || fail "CODEX_HOME Sol mismatch"
 test ! -e "$codex_home/config.toml" || fail "installer created config.toml"
 relative_parent=$tmp_dir/relative-parent
 mkdir "$relative_parent"
 (cd "$relative_parent" && sh "$installer" --target-dir relative-agents)
 cmp -s "$templates/$terra_file" "$relative_parent/relative-agents/$terra_file" || fail "relative target Terra mismatch"
+cmp -s "$templates/$deepseek_file" "$relative_parent/relative-agents/$deepseek_file" || fail "relative target DeepSeek mismatch"
 pass "CODEX_HOME and relative target behavior"
 
 migration_target=$tmp_dir/migration
 write_legacy_roles "$migration_target"
 sh "$installer" --target-dir "$migration_target"
 cmp -s "$templates/$terra_file" "$migration_target/$terra_file" || fail "legacy Terra was not migrated"
+cmp -s "$templates/$deepseek_file" "$migration_target/$deepseek_file" || fail "DeepSeek was not added during migration"
 cmp -s "$templates/$sol_file" "$migration_target/$sol_file" || fail "Sol changed during migration"
 test ! -e "$migration_target/$luna_file" || fail "exact legacy Luna was not removed"
 sh "$installer" --target-dir "$migration_target" --check
 pass "exact v0.2.0 Terra replacement and Luna retirement"
+
+v04_migration_target=$tmp_dir/v04-migration
+write_v04_terra "$v04_migration_target"
+sh "$installer" --target-dir "$v04_migration_target"
+cmp -s "$templates/$terra_file" "$v04_migration_target/$terra_file" || fail "v0.4 Terra was not migrated"
+cmp -s "$templates/$deepseek_file" "$v04_migration_target/$deepseek_file" || fail "DeepSeek was not installed during v0.4 migration"
+cmp -s "$templates/$sol_file" "$v04_migration_target/$sol_file" || fail "Sol was not installed during v0.4 migration"
+sh "$installer" --target-dir "$v04_migration_target" --check
+pass "exact v0.4 Terra replacement"
 
 modified_luna=$tmp_dir/modified-luna
 write_legacy_roles "$modified_luna"
@@ -204,6 +264,15 @@ if sh "$installer" --target-dir "$modified_terra"; then fail "installer replaced
 after=$(snapshot_files "$modified_terra")
 [ "$before" = "$after" ] || fail "modified-Terra refusal partially mutated target"
 pass "modified Terra refusal with zero partial mutation"
+
+modified_deepseek=$tmp_dir/modified-deepseek
+sh "$installer" --target-dir "$modified_deepseek"
+printf '%s\n' modified >> "$modified_deepseek/$deepseek_file"
+before=$(snapshot_files "$modified_deepseek")
+if sh "$installer" --target-dir "$modified_deepseek"; then fail "installer replaced modified DeepSeek"; fi
+after=$(snapshot_files "$modified_deepseek")
+[ "$before" = "$after" ] || fail "modified-DeepSeek refusal partially mutated target"
+pass "modified DeepSeek refusal with zero partial mutation"
 
 stale_luna=$tmp_dir/stale-luna
 sh "$installer" --target-dir "$stale_luna"
@@ -224,6 +293,7 @@ if sh "$installer" --target-dir "$unsafe"; then fail "installer accepted symlink
 after=$(snapshot_files "$unsafe")
 [ "$before" = "$after" ] || fail "symlink refusal partially mutated target"
 test ! -e "$unsafe/$sol_file" || fail "symlink refusal partially installed Sol"
+test ! -e "$unsafe/$deepseek_file" || fail "symlink refusal partially installed DeepSeek"
 pass "unsafe destination refusal with zero partial mutation"
 
 runtime_sessions=$tmp_dir/runtime-sessions
@@ -249,8 +319,25 @@ zero_id=22222222-2222-7222-8222-222222222222
 if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$zero_id" >/dev/null 2>&1; then fail "runtime inspector accepted zero matches"; fi
 pass "runtime inspector Terra/High routing and safe refusal"
 
+deepseek_runtime_id=33333333-3333-7333-8333-333333333333
+deepseek_runtime_rollout=$runtime_day/rollout-2026-08-02T00-00-01-$deepseek_runtime_id.jsonl
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$deepseek_runtime_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"agent_role\":\"sol_advisor_deepseek_implementer\",\"agent_path\":\"/root/deepseek-fixture\",\"model_provider\":\"deepseek\",\"cwd\":\"/fixture\"}}" \
+  '{"type":"turn_context","payload":{"model":"deepseek/deepseek-v4-flash","effort":"high","sandbox_policy":{"type":"workspace-write"},"permission_profile":{"type":"managed"},"cwd":"/fixture"}}' \
+  > "$deepseek_runtime_rollout"
+deepseek_runtime_output=$(sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$deepseek_runtime_id")
+printf '%s\n' "$deepseek_runtime_output" | jq -e --arg id "$deepseek_runtime_id" '
+  .thread_id == $id and .agent_role == "sol_advisor_deepseek_implementer"
+  and .model_provider == "deepseek"
+  and .model == "deepseek/deepseek-v4-flash" and .effort == "high"
+  and .sandbox_policy_type == "workspace-write"
+  and .permission_profile_type == "managed"
+' >/dev/null || fail "runtime inspector returned wrong DeepSeek/High evidence"
+pass "runtime inspector DeepSeek/High routing"
+
 for document in "$skill" "$contracts"; do
   grep -Fq 'agent_type: sol_advisor_terra_implementer' "$document" || fail "missing Terra spawn in $document"
+  grep -Fq 'agent_type: sol_advisor_deepseek_implementer' "$document" || fail "missing DeepSeek spawn in $document"
   grep -Fq 'agent_type: sol_advisor_sol_reviewer' "$document" || fail "missing Sol spawn in $document"
   grep -Fq 'fork_turns: none' "$document" || fail "missing fresh context in $document"
   if grep -Eq 'agent_type:.*(luna|terra_max)' "$document"; then fail "retired implementation spawn remains in $document"; fi
@@ -262,6 +349,19 @@ grep -Fqi 'public native spawn/details metadata first' "$skill" || fail "skill l
 grep -Fqi 'parent captures and verifies exact before-and-after' "$contracts" || fail "contracts lack behavioral read-only state check"
 grep -Fq 'luna-task-lane.md' "$skill" || fail "skill does not link the Luna task contract"
 grep -Fq 'luna-task-lane.md' "$contracts" || fail "role contracts do not link the Luna task contract"
+grep -Fq 'deepseek-native-lane.md' "$skill" || fail "skill does not link the DeepSeek contract"
+grep -Fq 'deepseek-native-lane.md' "$contracts" || fail "role contracts do not link the DeepSeek contract"
+
+for document in "$skill" "$contracts" "$deepseek_contract" "$readme"; do
+  grep -Fq 'deepseek/deepseek-v4-flash' "$document" || fail "$document omits the exact DeepSeek model"
+done
+grep -Fq 'sol_advisor_deepseek_implementer' "$deepseek_contract" || fail "DeepSeek contract omits exact agent type"
+grep -Fq 'fork_turns: none' "$deepseek_contract" || fail "DeepSeek contract omits fresh spawn context"
+grep -Fq 'work begins with a clear' "$deepseek_contract" || fail "DeepSeek contract omits pre-work fallback boundary"
+grep -Fq 'explicitly requires DeepSeek' "$deepseek_contract" || fail "DeepSeek contract omits explicit-request fail-closed rule"
+grep -Fq 'stop without fallback' "$deepseek_contract" || fail "DeepSeek contract permits explicit-request fallback"
+grep -Fq 'unreadable_encrypted_agent_task' "$deepseek_contract" || fail "DeepSeek contract omits encrypted-task failure"
+grep -Fq 'default multi-agent mode' "$deepseek_contract" || fail "DeepSeek contract forces a global surface mode"
 
 for tool in list_projects list_threads create_thread wait_threads read_thread send_message_to_thread; do
   for document in "$skill" "$contracts" "$luna_contract" "$readme"; do
@@ -302,6 +402,7 @@ grep -Fq 'Luna task (explicit opt-in)' "$readme" || fail "README omits the Luna 
 grep -Fq 'Use the Luna task lane' "$readme" || fail "README omits explicit Luna authorization"
 grep -Fq 'native lane remains' "$readme" || fail "README does not preserve the native lane"
 grep -Fq 'does not use a Luna' "$readme" || fail "README permits a Luna companion TOML"
+grep -Fq 'capability-gated DeepSeek' "$manifest" || fail "manifest UI omits capability-gated DeepSeek"
 grep -Fq 'user-visible GPT-5.6 Luna / Max tasks' "$manifest" || fail "manifest UI omits user-visible Luna tasks"
 grep -Fq 'list_threads' "$manifest" || fail "manifest UI omits list_threads"
 grep -Fq 'list_threads' "$ui" || fail "skill UI omits list_threads"
@@ -316,19 +417,19 @@ if grep -Fq 'with plugins, native subagents, and' "$readme"; then
 fi
 grep -Fq 'explicitly opt into Luna' "$ui" || fail "skill UI omits explicit Luna opt-in"
 
-for document in "$readme" "$manifest" "$skill" "$contracts" "$ui"; do
-  if grep -Eqi 'Terra / High is the sole implementation producer|one role-pinned .*handles all implementation|route all implementation through.*Terra|delegate all implementation to (the )?(native )?Terra' "$document"; then
+for document in "$readme" "$manifest" "$skill" "$contracts" "$deepseek_contract" "$ui"; do
+  if grep -Eqi 'Terra / High is the sole implementation producer|one role-pinned .*handles all implementation|route all implementation through.*Terra|delegate all implementation to (the )?(native )?Terra|sole native implementation lane|only implementation lane' "$document"; then
     fail "stale single-mode implementation claim remains in $document"
   fi
 done
 forbidden_terra='sol_advisor_terra_'"max"
 forbidden_file='sol-advisor-terra-'"max"
 if grep -ERn "$forbidden_terra|$forbidden_file" "$readme" "$plugin_dir"; then fail "forbidden second Terra role remains"; fi
-pass "native and Luna contracts, opt-in guards, and stale-claim checks"
+pass "native DeepSeek/Terra/Sol and Luna contracts, opt-in guards, fallback guards, and stale-claim checks"
 
 sh -n "$installer"
 sh -n "$runtime_inspector"
 sh -n "$script_dir/verify.sh"
 pass "shell syntax"
 
-printf '%s\n' "VERIFY PASSED: Sol Advisor two-role migration checks completed in $tmp_dir"
+printf '%s\n' "VERIFY PASSED: Sol Advisor three-role migration checks completed in $tmp_dir"

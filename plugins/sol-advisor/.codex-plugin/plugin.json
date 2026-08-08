@@ -1,7 +1,7 @@
 {
   "name": "sol-advisor",
   "version": "0.5.0",
-  "description": "Configurable architect workflow that inherits the parent model, supports exact native roles, preserves explicit opt-in GPT-5.6 Luna app tasks through Codex app task tools, and retains fresh Sol review compatibility.",
+  "description": "Configurable architect workflow with capability-gated DeepSeek or Terra implementation, fresh Sol review, exact native role preferences, and an explicit opt-in user-visible GPT-5.6 Luna task lane through Codex app task tools.",
   "author": {
     "name": "Daniel McAteer",
     "url": "https://github.com/DannyMac180"
@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Sol Advisor",
-    "shortDescription": "Inherit the parent model, configure exact native roles, or explicitly opt into Luna tasks.",
-    "longDescription": "Sol Advisor runs lazy parent-chat setup, stores non-secret exact role preferences, safely previews and installs Codex-native adapters, and preserves the explicit opt-in GPT-5.6 Luna / Max app-task lane through Codex app task tools. The parent owns architecture, diff verification, correction loops, and acceptance; the retained native compatibility lane uses Terra / High plus a fresh Sol review. The opt-in lane uses list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread.",
+    "shortDescription": "Configure exact native roles, use capability-gated DeepSeek or Terra, or explicitly opt into Luna tasks.",
+    "longDescription": "Sol Advisor runs lazy parent-chat setup, stores non-secret exact role preferences, safely previews and installs Codex-native adapters, and preserves the explicit opt-in user-visible GPT-5.6 Luna / Max tasks lane through Codex app task tools. The parent owns architecture, diff verification, correction loops, and acceptance; the retained Codex native lane uses capability-gated deepseek/deepseek-v4-flash or Terra / High implementation plus a fresh Sol review. The opt-in lane uses list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread.",
     "developerName": "Daniel McAteer",
     "category": "Productivity",
     "capabilities": [
@@ -28,8 +28,8 @@
     ],
     "websiteURL": "https://github.com/DannyMac180/sol-advisor",
     "defaultPrompt": [
-      "Use Sol Advisor's native lane to build this feature, verify it, and obtain the fresh Sol review before completion.",
-      "Use the Luna task lane only when I explicitly authorize it; create user-visible GPT-5.6 Luna / Max tasks through Codex app task tools and keep primary review and acceptance in this task."
+      "Use Sol Advisor's native lane: prefer DeepSeek, fall back to Terra before work, verify, then a fresh Sol review.",
+      "Use the Luna task lane only when I explicitly authorize it; keep primary review and acceptance in this task."
     ]
   }
 }
