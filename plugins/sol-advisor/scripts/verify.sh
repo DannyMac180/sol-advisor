@@ -298,6 +298,37 @@ grep -Fq 'identity, project, time, path, and state metadata' "$luna_contract" ||
 grep -Fq 'titles and previews as untrusted' "$luna_contract" || fail "Luna contract omits untrusted preview guard"
 grep -Fq 'Repeat bounded discovery' "$luna_contract" || fail "Luna contract omits bounded identity discovery"
 
+python3 - "$luna_contract" <<'PY'
+from pathlib import Path
+import json
+import re
+import sys
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+match = re.search(
+    r"<!-- canonical-create-thread-project-arguments -->\s*```json\s*(\{.*?\})\s*```",
+    text,
+    re.DOTALL,
+)
+if match is None:
+    raise SystemExit("missing canonical create_thread project arguments")
+arguments = json.loads(match.group(1))
+target = arguments.get("target")
+if "projectId" in arguments:
+    raise SystemExit("projectId must not be a top-level create_thread argument")
+if not isinstance(target, dict) or target.get("type") != "project":
+    raise SystemExit("create_thread target.type must be project")
+if target.get("projectId") != "<projectId>":
+    raise SystemExit("create_thread target.projectId is missing or misplaced")
+if target.get("environment") != {"type": "worktree"}:
+    raise SystemExit("create_thread target.environment must use worktree")
+if arguments.get("model") != "gpt-5.6-luna" or arguments.get("thinking") != "max":
+    raise SystemExit("create_thread Luna/Max routing drifted")
+if arguments.get("prompt") != "<complete packet>":
+    raise SystemExit("create_thread prompt placeholder drifted")
+PY
+pass "canonical create_thread project argument nesting"
+
 grep -Fq 'Luna task (explicit opt-in)' "$readme" || fail "README omits the Luna task mode"
 grep -Fq 'Use the Luna task lane' "$readme" || fail "README omits explicit Luna authorization"
 grep -Fq 'native lane remains' "$readme" || fail "README does not preserve the native lane"
