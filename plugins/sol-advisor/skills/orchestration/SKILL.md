@@ -157,6 +157,15 @@ is wrong, correct the specification and delegate the fix. If the Luna result is 
 send a precise correction back to the same task. Do not silently repair a failed child
 patch or create a replacement task merely to avoid an unresolved correction.
 
+If substantive delegated work is already complete but the selected implementation
+lane becomes unavailable because of an external quota or tool outage, the primary may
+perform bounded mechanical closure only when the user explicitly authorizes it in the
+current request. Limit that exception to documentation, formatting, or an obvious test
+fixture/expectation correction that introduces no architecture or product decision.
+Disclose the exception, include it in the reviewed correction diff, and apply the same
+focused checks and fresh review. Never use this exception as a silent fallback for
+substantive implementation.
+
 ## Retained Codex native implementation through Terra / High
 
 This section applies only to the explicitly retained exact Codex compatibility lane, not configured adapters. Use the same role for routine features, mechanical edits, difficult debugging,
@@ -229,10 +238,49 @@ Treat worker reports as claims. Before acceptance:
 
 1. Inspect the working tree and complete diff.
 2. Confirm only in-scope files changed.
-3. Rerun the specification's verification commands in the primary session.
+3. Rerun focused checks that directly cover the changed authority and contracts in the
+   primary session.
 4. Compare the evidence with the objective, interfaces, and constraints.
 5. For the native lane, delegate corrections through Terra; for the Luna lane, send
    corrections back to the same task and re-review its updated evidence.
+
+## Use a risk-tiered native delivery gate
+
+For the native lane, make the candidate stable and reviewable before paying for broad
+verification:
+
+1. The implementer completes one coherent slice and runs focused covering checks.
+2. The primary inspects the complete diff and reruns those focused checks.
+3. A fresh advisor reviews that stable candidate and returns one consolidated finding
+   set. Prefer an uncommitted candidate when the host and repository allow it; if a
+   commit is required, avoid repeated amendments and squash only at acceptance.
+4. Send the complete finding set through one bounded correction pass. Rerun only the
+   checks covering the correction, then obtain a fresh scoped closure review against
+   the correction diff and original findings. Do not restart a whole-slice review when
+   the unchanged slice was already reviewed.
+5. After review closure, run the full applicable verification matrix once, finalize
+   reports once, create or amend one slice commit, push once, and use CI as the remote
+   confirmation.
+
+Choose the final matrix by impact. Run owning-module and dependent checks for changed
+authority. Run client, visual-baseline, native-smoke, packaging, or distribution gates
+only when those surfaces or their runtime dependencies changed. Escalate to broader
+checks before review only when impact is uncertain, the task is cross-cutting, or a
+specific early gate is required to make the candidate reviewable.
+
+If the final matrix fails and a code or artifact correction is required, the prior
+verdict is invalid: apply one consolidated fix, rerun covering checks, and obtain a new
+scoped review before repeating only the affected final gates. A final matrix that
+passes without changing the reviewed candidate does not require a duplicate review.
+
+For the Luna task lane, preserve the same economic ordering without spawning a native
+advisor: obtain one stable child handoff with focused evidence, inspect the complete
+diff in the primary, send one consolidated correction message to that same task, and
+inspect the correction diff for addressed findings and introduced breakage. The
+primary then runs the impact-based final matrix, finalizes reports, authorizes PR work,
+and accepts the result. Any later correction invalidates that primary acceptance and
+reopens only the affected correction, inspection, and final gates. The detailed Luna
+task-lane contract remains authoritative for its tools and task identity.
 
 ## Consult fresh Sol at native commitment boundaries
 
@@ -252,8 +300,8 @@ through this native reviewer.
 
 ## Require the final Sol review for the native lane
 
-After native implementation and parent verification, always spawn a new, fresh
-reviewer:
+After native implementation and the focused parent gate above, always spawn a new,
+fresh reviewer:
 
 ~~~text
 agent_type: sol_advisor_sol_reviewer
@@ -264,8 +312,9 @@ Use the final-review packet from the role contracts. Instruct the reviewer to re
 behaviorally read-only, inspect the actual files and accumulated diff, and return
 exactly `ship`, `fix-first`, or `rethink`.
 
-- `ship`: report completion with verification evidence.
-- `fix-first`: delegate the required fixes, verify again, and obtain a new review.
+- `ship`: run the applicable final matrix once, then report completion with evidence.
+- `fix-first`: delegate the consolidated required fixes, rerun covering checks, and
+  obtain a fresh scoped closure review.
 - `rethink`: revise architecture and do not report completion.
 
 Never let the reviewer implement its own fixes. A Sol-on-Sol review is context-clean,

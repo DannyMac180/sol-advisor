@@ -64,7 +64,9 @@ JUDGMENT CALLS: <decisions the specification left open, or none>
 GAPS: <unfinished work, ambiguity, or none>
 ~~~
 
-The primary session must inspect the diff and rerun verification itself.
+The primary session must inspect the diff and rerun focused covering verification
+itself. Broad applicable verification belongs after advisor closure unless impact is
+uncertain or an early broad gate is required to make the candidate reviewable.
 
 ## Luna task lane - separate user-visible app tasks
 
@@ -132,7 +134,7 @@ surface ambiguity instead of redesigning the architecture.
 
 ## Fresh Sol - requested-read-only final reviewer
 
-After parent verification, spawn a new native thread exactly:
+After focused parent verification, spawn a new native thread exactly:
 
 ~~~text
 agent_type: sol_advisor_sol_reviewer
@@ -163,6 +165,12 @@ VERIFICATION EVIDENCE
 - <command> -> <actual primary-session output evidence>
 - <artifact or diff inspection> -> <actual evidence>
 
+REVIEW SCOPE
+<For an initial review: the complete stable slice. For correction closure: the exact
+correction diff, original findings, and covering evidence; unchanged accepted scope is
+out of scope unless the correction broke it. Judge whether each original finding is
+addressed and flag new breakage introduced by the correction.>
+
 REVIEW
 Inspect the actual files and accumulated change set. Judge correctness, completeness,
 regressions, scope discipline, interface preservation, test adequacy, and material risk.
@@ -174,8 +182,12 @@ FINDINGS: <precise file references and required fixes, or none>
 RESIDUAL RISK: <most important remaining risk, or none>
 ~~~
 
-If any fix is made after review, discard the verdict and run a new fresh review.
-Sol reviewing Sol is context-clean, not cross-model-family independence.
+If any fix is made after review, discard the verdict. Consolidate the complete finding
+set into one correction pass, rerun its covering checks, and run a new fresh scoped
+closure review. After `ship`, the primary runs the impact-based full matrix once,
+finalizes reports, commits, pushes, and uses CI once. A failure that requires another
+change invalidates the verdict and repeats only the affected correction and closure
+gates. Sol reviewing Sol is context-clean, not cross-model-family independence.
 
 Use observed isolation, not requested isolation:
 

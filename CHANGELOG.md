@@ -10,6 +10,11 @@ All notable changes to Sol Advisor are documented here. This project follows
 - Cursor local-clone installation guide plus developer smoke-test procedure with guarded setup, evidence, and cleanup steps.
 - Guarded macOS TypeScript installer for Cursor's project-scoped local MCP compatibility bridge, including workspace-isolated data, receipt validation, concurrent-edit refusal, crash recovery, and lifecycle tests.
 
+### Changed
+
+- Native delivery now reviews a focused stable candidate before expensive broad verification, consolidates corrections into one wave with a scoped closure review, and runs impact-based full verification, reporting, commit, push, and CI gates once after review closure.
+- The primary may perform explicitly authorized mechanical closure after an external implementation-lane outage, while substantive implementation remains delegated and the correction still requires focused checks and fresh review.
+
 ### Fixed
 
 - Cursor 3.15.6 local installation now uses a verified directory copy instead of an externally resolved symlink.
