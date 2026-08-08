@@ -113,6 +113,73 @@ grep -Fq 'Codex app task tools' "$manifest" || fail "manifest does not describe 
 grep -Fq 'fresh Sol' "$manifest" || fail "manifest does not preserve native fresh Sol review"
 pass "manifest JSON, version, and both-mode UI language"
 
+python3 - "$skill" "$contracts" <<'PY'
+from pathlib import Path
+import sys
+
+skill = Path(sys.argv[1]).read_text()
+contracts = Path(sys.argv[2]).read_text()
+
+def require(text, fragments, label):
+    missing = [fragment for fragment in fragments if fragment not in text]
+    if missing:
+        raise SystemExit(f"{label} missing material contract: {missing}")
+
+native_order = [
+    "The implementer completes one coherent slice and runs focused covering checks.",
+    "The primary inspects the complete diff and reruns those focused checks.",
+    "A fresh advisor reviews that stable candidate and returns one consolidated finding",
+    "Send the complete finding set through one bounded correction pass.",
+    "then obtain a fresh scoped closure review",
+    "After review closure, run the full applicable verification matrix once",
+]
+positions = [skill.find(marker) for marker in native_order]
+if any(position < 0 for position in positions) or positions != sorted(positions):
+    raise SystemExit("native risk-tiered gates are missing or out of order")
+
+require(skill, [
+    "inspects the complete diff",
+    "fresh scoped closure review",
+    "Do not restart a whole-slice review",
+    "Run client, visual-baseline, native-smoke, packaging, or distribution gates",
+    "impact is uncertain, the task is cross-cutting",
+    "verdict is invalid",
+], "native review and impact gate")
+require(skill, [
+    "Luna task lane",
+    "same economic ordering without spawning a native",
+    "advisor: obtain one stable child handoff",
+    "stable child handoff with focused evidence",
+    "send one consolidated correction message to that same task",
+    "introduced breakage",
+    "invalidates that primary acceptance",
+], "Luna-equivalent gate")
+require(skill, [
+    "substantive delegated work is already complete",
+    "external quota or tool outage",
+    "user explicitly authorizes it in the",
+    "current request. Limit that exception",
+    "bounded mechanical closure",
+    "documentation, formatting, or an obvious test",
+    "fixture/expectation correction",
+    "no architecture or product decision",
+    "Disclose the exception",
+    "include it in the reviewed correction diff",
+    "focused checks and fresh review",
+    "Never use this exception as a silent fallback for",
+    "substantive implementation.",
+], "mechanical-closure exception")
+require(contracts, [
+    "For an initial review: the complete stable slice",
+    "the exact\ncorrection diff, original findings, and covering evidence",
+    "unchanged accepted scope is\nout of scope unless the correction broke it",
+    "flag new breakage introduced by the correction",
+    "discard the verdict",
+    "impact-based full matrix once",
+], "scoped closure packet")
+PY
+pass "risk-tiered review and final-delivery gates"
+
 python3 - "$templates" <<'PY'
 from pathlib import Path
 import sys, tomllib

@@ -238,6 +238,14 @@ parent verifies the working tree and checks. The advisor remains behaviorally
 read-only unless the client exposes evidence of OS-enforced isolation; Sol Advisor
 reports the observed guarantee rather than inventing one.
 
+Native delivery uses a risk-tiered gate: focused implementation checks, parent diff
+inspection, one fresh advisor review, one consolidated correction wave with a scoped
+closure review, then one impact-based full verification/report/commit/push/CI gate.
+The Luna lane uses the same ordering with primary-owned handoff and correction review;
+it never spawns the native advisor. Unchanged client, visual, native, packaging, and
+distribution surfaces are not rerun by default. Any post-verdict or post-acceptance
+correction reopens only the affected closure gates.
+
 The historical exact Codex native lane remains compatible: separately installed
 Terra / High implementation and a fresh Sol / High reviewer. It does not use a Luna
 custom-agent TOML. The Luna lane instead uses app task tools and is outside native
