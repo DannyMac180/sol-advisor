@@ -44,7 +44,7 @@ describe("MCP protocol",()=>{
 });
 
 describe("PLUGIN_DATA boundary",()=>{
- test("rejects broad access, forbidden roots, and symlink ancestors without changing permissions",async()=>{
+ test("rejects broad access and forbidden roots without changing permissions",async()=>{
   if(process.platform==="win32"){
    for(const sid of ["S-1-1-0","S-1-5-32-545","S-1-5-11"]){
     execFileSync(icacls,[data,"/grant",`*${sid}:(OI)(CI)R`]);
@@ -55,8 +55,10 @@ describe("PLUGIN_DATA boundary",()=>{
   }else{
    chmodSync(data,0o755);await expect(callTool("get_setup_status")).rejects.toThrow("must be private");expect(statSync(data).mode&0o777).toBe(0o755);chmodSync(data,0o700);await callTool("get_setup_status");
   }
-  for(const bad of ["/",realpathSync(homedir()),realpathSync(join(import.meta.dir,".."))]){process.env.PLUGIN_DATA=bad;await expect(callTool("get_setup_status")).rejects.toThrow("cannot be");}
-  const actual=join(root,"actual");mkdirSync(join(actual,"data"),{recursive:true});symlinkSync(actual,join(root,"linked"),process.platform==="win32"?"junction":"dir");process.env.PLUGIN_DATA=join(root,"linked","data");await expect(callTool("get_setup_status")).rejects.toThrow("symlink ancestor");process.env.PLUGIN_DATA=data;
+  for(const bad of new Set(["/",parse(data).root,realpathSync(homedir()),realpathSync(join(import.meta.dir,".."))])){process.env.PLUGIN_DATA=bad;await expect(callTool("get_setup_status")).rejects.toThrow("cannot be");}
+ });
+ test("rejects a symlink ancestor before pinning PLUGIN_DATA",async()=>{
+  const actual=join(root,"actual"),actualData=join(actual,"data");mkdirSync(actualData,{recursive:true});makePrivate(actualData);symlinkSync(actual,join(root,"linked"),process.platform==="win32"?"junction":"dir");process.env.PLUGIN_DATA=join(root,"linked","data");await expect(callTool("get_setup_status")).rejects.toThrow("symlink ancestor");process.env.PLUGIN_DATA=data;
  });
  test("pins PLUGIN_DATA device and inode for process lifetime",async()=>{
   await callTool("get_setup_status");renameSync(data,join(root,"old-data"));mkdirSync(data);makePrivate(data);await expect(callTool("get_setup_status")).rejects.toThrow("identity changed");

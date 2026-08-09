@@ -106,9 +106,9 @@ function assertPrivateFile(path:string,label:string){
 function dataDir(): string {
   const raw=process.env.PLUGIN_DATA;
   if (!raw || !isAbsolute(raw)) throw new Error("PLUGIN_DATA must be an explicit absolute existing directory");
-  const lexical=resolve(raw), forbidden=new Set([resolve(sep),realpathSync(homedir()),pluginRoot]);
+  const lexical=resolve(raw),filesystemRoot=resolve(parse(lexical).root),forbidden=new Set([filesystemRoot,realpathSync(homedir()),pluginRoot]);
   if(forbidden.has(lexical)) throw new Error("PLUGIN_DATA cannot be filesystem root, home, or plugin root");
-  let cursor=resolve(sep); for(const part of relative(resolve(sep),lexical).split(sep).filter(Boolean)){cursor=join(cursor,part);if(existsSync(cursor)&&lstatSync(cursor).isSymbolicLink())throw new Error(`PLUGIN_DATA has symlink ancestor: ${cursor}`);}
+  let cursor=filesystemRoot;for(const part of relative(filesystemRoot,lexical).split(sep).filter(Boolean)){cursor=join(cursor,part);if(existsSync(cursor)&&lstatSync(cursor).isSymbolicLink())throw new Error(`PLUGIN_DATA has symlink ancestor: ${cursor}`);}
   if (!existsSync(lexical) || !lstatSync(lexical).isDirectory() || lstatSync(lexical).isSymbolicLink()) throw new Error("PLUGIN_DATA must be an existing non-symlink directory");
   const actual=realpathSync(lexical), st=statSync(actual), pinned=pinnedDataDir;
   assertPrivateDirectory(actual,"PLUGIN_DATA");
