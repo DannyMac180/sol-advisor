@@ -1,15 +1,17 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync, existsSync, realpathSync, chmodSync, statSync, renameSync, readdirSync } from "node:fs";
 import { dirname, join, parse } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { __resetDataPinForTests, __setManifestWriteFaultForTests, callTool, handle, renderAdapter } from "./server";
 
+if(process.platform==="win32")setDefaultTimeout(30_000);
 let root="", data="", workspace="";
 const base=(client="codex",scope="project")=>({client,scope,workspace,orchestrator:{model:"inherit",recommendation:{model:"gpt-5.6-sol",effort:"high"}},roles:{routine:{model:"gpt-5.6-terra",...(client==="codex"||client==="cursor"?{effort:"high"}:{})},high:{model:"gpt-5.6-terra",...(client==="codex"||client==="cursor"?{effort:"high"}:{})},advisor:{model:"gpt-5.6-sol",...(client==="codex"||client==="cursor"?{effort:"high"}:{}),readonly:true}}});
-const windowsRoot=join(parse(homedir()).root,"Windows");
+const windowsRoot=process.env.SystemRoot??process.env.WINDIR??(process.env.SystemDrive?join(process.env.SystemDrive,"Windows"):join(parse(process.execPath).root,"Windows"));
 const windowsPowerShell=join(windowsRoot,"System32","WindowsPowerShell","v1.0","powershell.exe");
 const icacls=join(windowsRoot,"System32","icacls.exe");
+const windowsUsersSid="*S-1-5-32-545";
 function makePrivate(path:string){
  if(process.platform!=="win32"){chmodSync(path,0o700);return;}
  const sid=execFileSync(windowsPowerShell,["-NoLogo","-NoProfile","-NonInteractive","-Command","[Security.Principal.WindowsIdentity]::GetCurrent().User.Value"],{encoding:"utf8"}).trim();
@@ -66,6 +68,12 @@ describe("PLUGIN_DATA boundary",()=>{
   finally{makePrivate(data);}
   await expect(callTool("get_setup_status")).resolves.toBeTruthy();
  });
+ test("rejects an unexpected Windows owner",async()=>{
+  if(process.platform!=="win32")return;
+  process.env.PLUGIN_DATA=realpathSync(join(windowsRoot,"System32"));
+  try{await expect(callTool("get_setup_status")).rejects.toThrow("owner is outside the approved Windows principals");}
+  finally{process.env.PLUGIN_DATA=data;}
+ });
 });
 
 describe("configuration",()=>{
@@ -115,6 +123,40 @@ describe("configuration",()=>{
   finally{if(process.platform==="win32")execFileSync(icacls,[backups,"/remove:g","*S-1-5-32-545"]);makePrivate(backups);}
   await expect(callTool("save_preferences",base())).resolves.toBeTruthy();
  });
+ test("rejects a broad ACL on an existing Windows config",async()=>{
+  if(process.platform!=="win32")return;
+  await callTool("save_preferences",base());
+  const config=join(data,"config.json");
+  execFileSync(icacls,[config,"/grant",`${windowsUsersSid}:R`]);
+  try{const state:any=await callTool("get_setup_status");expect(state.status).toBe("corrupt");expect(state.detail).toContain("unapproved allow ACE");}
+  finally{execFileSync(icacls,[config,"/remove:g",windowsUsersSid]);}
+ });
+ test("rejects a broad ACL on an existing Windows manifest",async()=>{
+  if(process.platform!=="win32")return;
+  await callTool("save_preferences",base());
+  const manifest=join(data,"managed-files.json");
+  writeFileSync(manifest,JSON.stringify({schemaVersion:1,files:[],updatedAt:new Date().toISOString()}));
+  execFileSync(icacls,[manifest,"/grant",`${windowsUsersSid}:R`]);
+  try{await expect(callTool("uninstall_client_adapter",{})).rejects.toThrow("unapproved allow ACE");}
+  finally{execFileSync(icacls,[manifest,"/remove:g",windowsUsersSid]);}
+ });
+ test("rejects a broad ACL on an existing Windows journal",async()=>{
+  if(process.platform!=="win32")return;
+  const journal=join(data,"transaction.json");
+  writeFileSync(journal,"{}");
+  execFileSync(icacls,[journal,"/grant",`${windowsUsersSid}:R`]);
+  try{await expect(callTool("get_setup_status")).rejects.toThrow("unapproved allow ACE");}
+  finally{execFileSync(icacls,[journal,"/remove:g",windowsUsersSid]);unlinkSync(journal);}
+ });
+ test("rejects a broad ACL on an existing Windows backup",async()=>{
+  if(process.platform!=="win32")return;
+  await callTool("save_preferences",base());
+  await callTool("save_preferences",base());
+  const backups=join(data,"backups"),backup=join(backups,readdirSync(backups).find(name=>name.endsWith(".bak"))!);
+  execFileSync(icacls,[backup,"/grant",`${windowsUsersSid}:R`]);
+  try{await expect(callTool("save_preferences",base())).rejects.toThrow("unapproved allow ACE");}
+  finally{execFileSync(icacls,[backup,"/remove:g",windowsUsersSid]);}
+ },10_000);
 
 });
 
