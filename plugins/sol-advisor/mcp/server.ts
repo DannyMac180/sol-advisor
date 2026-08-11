@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync, copyFileSync, chmodSync, linkSync, statSync, openSync, fsyncSync, closeSync } from "node:fs";
-import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { execFileSync } from "node:child_process";
+import { constants as fsConstants, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync, copyFileSync, chmodSync, linkSync, statSync, openSync, fsyncSync, closeSync, readdirSync } from "node:fs";
+import { homedir, platform } from "node:os";
+import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 
 export const CONFIG_SCHEMA_VERSION = 1;
 export const MANAGED_MARKER = "sol-advisor-managed:v1";
@@ -28,35 +29,125 @@ type Manifest = { schemaVersion: 1; files: ManagedFile[]; updatedAt: string };
 const pluginRoot = resolve(import.meta.dir, "..");
 let pinnedDataDir:{lexical:string;real:string;dev:number;ino:number}|undefined;
 export function __resetDataPinForTests(){pinnedDataDir=undefined;}
+const windowsAclCheck = String.raw`
+$ErrorActionPreference = "Stop"
+$target = [Environment]::GetEnvironmentVariable("SOL_ADVISOR_ACL_PATH", "Process")
+$kind = [Environment]::GetEnvironmentVariable("SOL_ADVISOR_ACL_KIND", "Process")
+if ($kind -eq "directory") {
+  $security = [IO.Directory]::GetAccessControl($target)
+} elseif ($kind -eq "file") {
+  $security = [IO.File]::GetAccessControl($target)
+} else {
+  throw "Unsupported ACL object kind"
+}
+$currentUser = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$allowedOwners = @(
+  $currentUser,
+  "S-1-5-18",
+  "S-1-5-32-544"
+)
+$owner = $security.GetOwner([Security.Principal.SecurityIdentifier]).Value
+if ($allowedOwners -notcontains $owner) { Write-Output "unsafe-owner"; exit 0 }
+$raw = [Security.AccessControl.RawSecurityDescriptor]::new($security.GetSecurityDescriptorBinaryForm(), 0)
+if ($null -eq $raw.DiscretionaryAcl) { Write-Output "unsafe-null-dacl"; exit 0 }
+$allowed = @(
+  $currentUser,
+  "S-1-5-18",
+  "S-1-5-32-544",
+  "S-1-3-0",
+  "S-1-3-4"
+)
+$codexSandboxUsers = $null
+try {
+  $codexSandboxUsers = [Security.Principal.NTAccount]::new(
+    [Environment]::MachineName,
+    "CodexSandboxUsers"
+  ).Translate([Security.Principal.SecurityIdentifier]).Value
+} catch [Security.Principal.IdentityNotMappedException] {}
+$codexReadExecute = [int]([Security.AccessControl.FileSystemRights]::ReadAndExecute -bor [Security.AccessControl.FileSystemRights]::Synchronize)
+foreach ($entry in $security.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
+  if ($entry.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) { continue }
+  $sid = $entry.IdentityReference.Value
+  if ($allowed -contains $sid) { continue }
+  if ($null -ne $codexSandboxUsers -and $sid -eq $codexSandboxUsers) {
+    $rights = [int]$entry.FileSystemRights
+    if (($rights -band (-bnot $codexReadExecute)) -eq 0) { continue }
+    Write-Output "unsafe-codex-access"; exit 0
+  }
+  Write-Output "unsafe-access"; exit 0
+}
+Write-Output "private"
+`;
+type WindowsAclKind="directory"|"file";
+function windowsPowerShellPath(){
+  const roots=[process.env.SystemRoot,process.env.WINDIR,process.env.SystemDrive?join(process.env.SystemDrive,"Windows"):undefined,join(parse(process.execPath).root,"Windows"),join(parse(homedir()).root,"Windows")]
+    .filter((root):root is string=>typeof root==="string"&&isAbsolute(root));
+  const seen=new Set<string>();
+  for(const root of roots){
+    const normalized=resolve(root),key=normalized.toLowerCase();if(seen.has(key))continue;seen.add(key);
+    const candidate=join(normalized,"System32","WindowsPowerShell","v1.0","powershell.exe");
+    if(existsSync(candidate)&&lstatSync(candidate).isFile()&&!lstatSync(candidate).isSymbolicLink())return candidate;
+  }
+  throw new Error("Windows PowerShell is unavailable");
+}
+function assertPrivateWindowsPath(path:string,label:string,kind:WindowsAclKind){
+  const cacheKey=`${kind}:${path}`;if(activeWindowsAclChecks?.has(cacheKey))return;
+  let result:string;
+  try{
+    result=execFileSync(windowsPowerShellPath(),["-NoLogo","-NoProfile","-NonInteractive","-Command",windowsAclCheck],{encoding:"utf8",env:{...process.env,SOL_ADVISOR_ACL_PATH:path,SOL_ADVISOR_ACL_KIND:kind},timeout:30000,windowsHide:true}).trim();
+  }catch(error){
+    const code=error&&typeof error==="object"&&"code" in error&&typeof error.code==="string"?error.code:"unknown";
+    throw new Error(`${label} ACL could not be verified (${code})`);
+  }
+  if(result!=="private"){
+    const reason=result==="unsafe-owner"?"owner is outside the approved Windows principals":result==="unsafe-null-dacl"?"null DACL grants unrestricted access":result==="unsafe-codex-access"?"CodexSandboxUsers allow ACE exceeds read/execute":result==="unsafe-access"?"ACL contains an unapproved allow ACE":"Windows ACL verification returned an unexpected result";
+    throw new Error(`${label} must be private (${reason})`);
+  }
+  activeWindowsAclChecks?.add(cacheKey);
+}
+function assertPrivateDirectory(path:string,label:string){
+  if(platform()!=="win32"){
+    if((statSync(path).mode&0o077)!==0)throw new Error(`${label} must be private (no group/world permission bits)`);
+    return;
+  }
+  assertPrivateWindowsPath(path,label,"directory");
+}
+function assertPrivateFile(path:string,label:string){
+  if(platform()!=="win32")return;
+  const info=lstatSync(path);if(info.isSymbolicLink()||!info.isFile())throw new Error(`${label} must be a regular non-symlink file`);
+  assertPrivateWindowsPath(path,label,"file");
+}
 function dataDir(): string {
   const raw=process.env.PLUGIN_DATA;
   if (!raw || !isAbsolute(raw)) throw new Error("PLUGIN_DATA must be an explicit absolute existing directory");
-  const lexical=resolve(raw), forbidden=new Set([resolve(sep),realpathSync(homedir()),pluginRoot]);
+  const lexical=resolve(raw),filesystemRoot=resolve(parse(lexical).root),forbidden=new Set([filesystemRoot,realpathSync(homedir()),pluginRoot]);
   if(forbidden.has(lexical)) throw new Error("PLUGIN_DATA cannot be filesystem root, home, or plugin root");
-  let cursor=resolve(sep); for(const part of relative(resolve(sep),lexical).split(sep).filter(Boolean)){cursor=join(cursor,part);if(existsSync(cursor)&&lstatSync(cursor).isSymbolicLink())throw new Error(`PLUGIN_DATA has symlink ancestor: ${cursor}`);}
+  let cursor=filesystemRoot;for(const part of relative(filesystemRoot,lexical).split(sep).filter(Boolean)){cursor=join(cursor,part);if(existsSync(cursor)&&lstatSync(cursor).isSymbolicLink())throw new Error(`PLUGIN_DATA has symlink ancestor: ${cursor}`);}
   if (!existsSync(lexical) || !lstatSync(lexical).isDirectory() || lstatSync(lexical).isSymbolicLink()) throw new Error("PLUGIN_DATA must be an existing non-symlink directory");
   const actual=realpathSync(lexical), st=statSync(actual), pinned=pinnedDataDir;
-  if((st.mode&0o077)!==0)throw new Error("PLUGIN_DATA must be private (no group/world permission bits)");
+  assertPrivateDirectory(actual,"PLUGIN_DATA");
   if(pinned&&(pinned.lexical!==lexical||pinned.real!==actual||pinned.dev!==st.dev||pinned.ino!==st.ino))throw new Error("PLUGIN_DATA identity changed during this server process");
   if(!pinned)pinnedDataDir={lexical,real:actual,dev:st.dev,ino:st.ino}; return actual;
 }
 function configPath() { return join(dataDir(), "config.json"); }
 function manifestPath() { return join(dataDir(), "managed-files.json"); }
-function backupDir(){const root=dataDir(),path=join(root,"backups");if(!existsSync(path))mkdirSync(path,{mode:0o700});const info=lstatSync(path);if(info.isSymbolicLink()||!info.isDirectory())throw new Error("PLUGIN_DATA backups must be a real directory");const actual=realpathSync(path),rel=relative(root,actual);if(rel!=="backups"||isAbsolute(rel)||rel.startsWith(".."))throw new Error("PLUGIN_DATA backups escapes the pinned data root");if((statSync(actual).mode&0o077)!==0)throw new Error("PLUGIN_DATA backups must be private");return actual;}
+function backupDir(){const root=dataDir(),path=join(root,"backups");if(!existsSync(path))mkdirSync(path,{mode:0o700});const info=lstatSync(path);if(info.isSymbolicLink()||!info.isDirectory())throw new Error("PLUGIN_DATA backups must be a real directory");const actual=realpathSync(path),rel=relative(root,actual);if(rel!=="backups"||isAbsolute(rel)||rel.startsWith(".."))throw new Error("PLUGIN_DATA backups escapes the pinned data root");assertPrivateDirectory(actual,"PLUGIN_DATA backups");if(platform()==="win32")for(const entry of readdirSync(actual,{withFileTypes:true}))if(entry.name.endsWith(".bak"))assertPrivateFile(join(actual,entry.name),"PLUGIN_DATA backup");return actual;}
 function sha(text: string | Uint8Array) { return createHash("sha256").update(text).digest("hex"); }
-function syncFile(path:string){const fd=openSync(path,"r");try{fsyncSync(fd);}finally{closeSync(fd);}}
-function syncDir(path:string){const fd=openSync(path,"r");try{fsyncSync(fd);}finally{closeSync(fd);}}
+function syncFile(path:string){const fd=openSync(path,platform()==="win32"?"r+":"r");try{fsyncSync(fd);}finally{closeSync(fd);}}
+function syncDir(path:string){const fd=openSync(path,platform()==="win32"?"r+":"r");try{fsyncSync(fd);}finally{closeSync(fd);}}
+function copyPrivateBackup(source:string,destination:string,label:string){let created=false;try{copyFileSync(source,destination,fsConstants.COPYFILE_EXCL);created=true;chmodSync(destination,0o600);syncFile(destination);syncDir(dirname(destination));assertPrivateFile(destination,label);}catch(error){if(created&&existsSync(destination)){rmSync(destination,{force:true});syncDir(dirname(destination));}throw error;}}
 function atomicWrite(path: string, text: string) {
   mkdirSync(dirname(path), { recursive: true });
   const temp = join(dirname(path), `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`);
   try { writeFileSync(temp, text, { encoding: "utf8", mode: 0o600, flag: "wx" }); chmodSync(temp,0o600); syncFile(temp); renameSync(temp, path); syncDir(dirname(path)); }
   catch(error){ if(existsSync(temp)) rmSync(temp,{force:true}); throw error; }
 }
-function readJson(path: string): unknown { return JSON.parse(readFileSync(path, "utf8")); }
+function readSensitiveText(path:string,label:string){assertPrivateFile(path,label);return readFileSync(path,"utf8");}
+function readJson(path: string,label:string): unknown { return JSON.parse(readSensitiveText(path,label)); }
 function configState(): { status: "missing"|"ready"|"schema-old"|"corrupt"; preferences?: Preferences; detail?: string } {
   if (!existsSync(configPath())) return { status: "missing" };
   try {
-    const raw: any = readJson(configPath());
+    const raw: any = readJson(configPath(),"PLUGIN_DATA config.json");
     if (!raw || typeof raw !== "object" || raw.schemaVersion !== CONFIG_SCHEMA_VERSION) return { status: "schema-old", detail: "Setup schema is absent or unsupported; rerun setup." };
     if(typeof raw.activeProfile!=="string"||!raw.profiles||typeof raw.profiles!=="object"||!raw.profiles[raw.activeProfile]) return {status:"corrupt",detail:"active profile is missing"};
     const active=raw.profiles[raw.activeProfile], errors = validatePreferences(active);
@@ -152,7 +243,7 @@ export function renderAdapter(preferences: Preferences, workspaceInput: string) 
   previewPlans.set(confirmationToken,{digest:planDigest,expires:Date.now()+10*60_000,userToken:userScopeConfirmationToken,used:false});
   return { client:preferences.client,scope:preferences.scope,workspace,files,warnings,planDigest,targetState,expiresAt:new Date(Date.now()+10*60_000).toISOString(),confirmationToken,userScopeConfirmationToken,afterInstall:"Start a new chat or reload the client so native role discovery sees the adapter files." };
 }
-function loadManifest(): Manifest { if(!existsSync(manifestPath())) return {schemaVersion:1,files:[],updatedAt:new Date().toISOString()}; let x:any; try{x=readJson(manifestPath());}catch(error){throw new Error(`managed-file manifest is corrupt: ${String(error)}`);} if(x?.schemaVersion!==1||!Array.isArray(x.files)) throw new Error("managed-file manifest schema is unsupported"); const paths=new Set<string>(); for(const file of x.files){if(!file||typeof file.profileKey!=="string"||typeof file.path!=="string"||!isAbsolute(file.path)||typeof file.hash!=="string"||!/^[a-f0-9]{64}$/.test(file.hash))throw new Error("managed-file manifest entry is invalid");if(paths.has(file.path))throw new Error(`managed-file manifest contains duplicate path ownership: ${file.path}`);paths.add(file.path);} return x; }
+function loadManifest(): Manifest { if(!existsSync(manifestPath())) return {schemaVersion:1,files:[],updatedAt:new Date().toISOString()}; let x:any; try{x=readJson(manifestPath(),"PLUGIN_DATA managed-files.json");}catch(error){throw new Error(`managed-file manifest is corrupt: ${String(error)}`);} if(x?.schemaVersion!==1||!Array.isArray(x.files)) throw new Error("managed-file manifest schema is unsupported"); const paths=new Set<string>(); for(const file of x.files){if(!file||typeof file.profileKey!=="string"||typeof file.path!=="string"||!isAbsolute(file.path)||typeof file.hash!=="string"||!/^[a-f0-9]{64}$/.test(file.hash))throw new Error("managed-file manifest entry is invalid");if(paths.has(file.path))throw new Error(`managed-file manifest contains duplicate path ownership: ${file.path}`);paths.add(file.path);} return x; }
 function requireExactManaged(path:string, hashValue:string) { const text=readFileSync(path,"utf8"); if(!text.includes(MANAGED_MARKER)||sha(text)!==hashValue) throw new Error(`managed file changed; refusing: ${path}`); }
 type TxEntry={target:string;stage?:string;backup?:string;quarantine?:string;newHash:string;originalHash?:string;wasMissing?:boolean};
 type TransactionJournal={schemaVersion:1;operation:"install"|"uninstall";phase:"prepared"|"targets-committed"|"manifest-committed";committed:number;entries:TxEntry[];manifestExisted:boolean;originalManifest:string;newManifest:string;profileKey:string};
@@ -160,9 +251,10 @@ function journalPath(){return join(dataDir(),"transaction.json");}
 function writeJournal(tx:TransactionJournal){atomicWrite(journalPath(),JSON.stringify(tx,null,2)+"\n");}
 function removeJournal(){if(existsSync(journalPath())){rmSync(journalPath(),{force:true});syncDir(dirname(journalPath()));}}
 function currentHash(path:string){return existsSync(path)&&lstatSync(path).isFile()&&!lstatSync(path).isSymbolicLink()?sha(readFileSync(path)):undefined;}
+function sensitiveCurrentHash(path:string,label:string){if(!existsSync(path))return undefined;assertPrivateFile(path,label);return currentHash(path);}
 function removeExact(path:string,expected:string,label:string){if(currentHash(path)!==expected)throw new Error(`${label} hash mismatch: ${path}`);rmSync(path,{force:true});syncDir(dirname(path));}
 function restoreManifest(tx:TransactionJournal){
-  const actual=currentHash(manifestPath()),originalHash=sha(tx.originalManifest),newHash=sha(tx.newManifest);
+  const actual=sensitiveCurrentHash(manifestPath(),"PLUGIN_DATA managed-files.json"),originalHash=sha(tx.originalManifest),newHash=sha(tx.newManifest);
   if(tx.manifestExisted){if(actual===originalHash)return;if(actual!==newHash)throw new Error("manifest changed during rollback");atomicWrite(manifestPath(),tx.originalManifest);}
   else if(existsSync(manifestPath())) { if(actual!==newHash) throw new Error("manifest changed during rollback"); rmSync(manifestPath(),{force:true}); syncDir(dirname(manifestPath())); }
 }
@@ -190,7 +282,7 @@ function validateJournal(tx:any):asserts tx is TransactionJournal{
   }
 }
 function recoverTransaction(){
-  if(!existsSync(journalPath()))return;let tx:TransactionJournal;try{tx=readJson(journalPath()) as TransactionJournal;}catch{throw new Error("transaction journal is corrupt; manual recovery required");}
+  if(!existsSync(journalPath()))return;let tx:TransactionJournal;try{tx=readJson(journalPath(),"PLUGIN_DATA transaction.json") as TransactionJournal;}catch(error){throw new Error(`transaction journal is corrupt or unsafe: ${String(error)}; manual recovery required`);}
   validateJournal(tx);
   if(tx.phase==="manifest-committed"){for(const e of tx.entries){if(e.stage&&existsSync(e.stage))removeExact(e.stage,e.newHash,"recovery stage");if(e.quarantine&&existsSync(e.quarantine))removeExact(e.quarantine,e.originalHash!,"recovery quarantine");}removeJournal();return;}
   if(tx.operation==="install")rollbackInstall(tx);else if(tx.operation==="uninstall")rollbackUninstall(tx);else throw new Error("unknown transaction operation");
@@ -204,13 +296,13 @@ function installAdapter(args:any) {
   if(preview.scope==="user"&&args.userScopeConfirmationToken!==plan.userToken) throw new Error("user-scope installation requires the separate exact user-scope token"); plan.used=true;
   const manifest=loadManifest(), previous=new Map(manifest.files.map(f=>[f.path,f]));
   for(const f of preview.files){const known=previous.get(f.path);if(known&&known.profileKey!==state.preferences!.profileKey)throw new Error(`adapter path is owned by a different profile; explicit uninstall required: ${f.path}`);if(existsSync(f.path)){if(!known)throw new Error(`unmanaged/conflicting file refused: ${f.path}`);requireExactManaged(f.path,known.hash);}}
-  const originalManifest=existsSync(manifestPath())?readFileSync(manifestPath(),"utf8"):"", targetState=new Map(preview.targetState.map((x:any)=>[x.path,x.state]));
+  const originalManifest=existsSync(manifestPath())?readSensitiveText(manifestPath(),"PLUGIN_DATA managed-files.json"):"", targetState=new Map(preview.targetState.map((x:any)=>[x.path,x.state]));
   const entries:TxEntry[]=[],installed:ManagedFile[]=[];
   for(const f of preview.files){const expected=targetState.get(f.path),wasMissing=expected==="missing",backup=wasMissing?undefined:join(dataDir(),"backups",`${Date.now()}-${randomUUID()}-${basename(f.path)}-${String(expected).slice(0,12)}.bak`),stage=join(dirname(f.path),`.${basename(f.path)}.${randomUUID()}.stage`),quarantine=wasMissing?undefined:join(dirname(f.path),`.${basename(f.path)}.${randomUUID()}.quarantine`);entries.push({target:f.path,stage,backup,quarantine,newHash:f.hash,originalHash:wasMissing?undefined:String(expected),wasMissing});installed.push({profileKey:state.preferences!.profileKey,path:f.path,hash:f.hash,backup});}
   const retained=manifest.files.filter(f=>f.profileKey!==state.preferences!.profileKey),newManifest=JSON.stringify({schemaVersion:1,files:[...retained,...installed],updatedAt:new Date().toISOString()},null,2)+"\n";
   const tx:TransactionJournal={schemaVersion:1,operation:"install",phase:"prepared",committed:0,entries,manifestExisted:existsSync(manifestPath()),originalManifest,newManifest,profileKey:state.preferences!.profileKey};writeJournal(tx);
   try{
-    for(const e of entries){mkdirSync(dirname(e.target),{recursive:true});if(e.backup){const privateBackups=backupDir();if(dirname(e.backup)!==privateBackups)throw new Error("backup destination escaped private backup directory");copyFileSync(e.target,e.backup);chmodSync(e.backup,0o600);syncFile(e.backup);syncDir(dirname(e.backup));if(currentHash(e.backup)!==e.originalHash)throw new Error(`backup hash mismatch: ${e.target}`);}writeFileSync(e.stage!,preview.files.find((f:any)=>f.path===e.target)!.content,{encoding:"utf8",mode:0o600,flag:"wx"});chmodSync(e.stage!,0o600);syncFile(e.stage!);syncDir(dirname(e.stage!));}
+    for(const e of entries){mkdirSync(dirname(e.target),{recursive:true});if(e.backup){const privateBackups=backupDir();if(dirname(e.backup)!==privateBackups)throw new Error("backup destination escaped private backup directory");copyPrivateBackup(e.target,e.backup,"PLUGIN_DATA adapter backup");if(currentHash(e.backup)!==e.originalHash)throw new Error(`backup hash mismatch: ${e.target}`);}writeFileSync(e.stage!,preview.files.find((f:any)=>f.path===e.target)!.content,{encoding:"utf8",mode:0o600,flag:"wx"});chmodSync(e.stage!,0o600);syncFile(e.stage!);syncDir(dirname(e.stage!));}
     transactionFaultForTests?.("install-before-targets");
     for(let i=0;i<entries.length;i++){const e=entries[i]!;assertNoSymlinkPath(e.target,state.preferences!.scope==="project"?state.preferences!.workspace:realpathSync(homedir()));const actual=currentHash(e.target);if(e.wasMissing){if(actual!==undefined||existsSync(e.target))throw new Error(`target appeared after preview: ${e.target}`);}else{if(actual!==e.originalHash)throw new Error(`managed target changed after preview: ${e.target}`);const before=lstatSync(e.target);transactionFaultForTests?.(`install-before-quarantine-${i+1}`);if(existsSync(e.quarantine!))throw new Error(`install quarantine conflict: ${e.quarantine}`);renameSync(e.target,e.quarantine!);syncDir(dirname(e.target));const quarantined=lstatSync(e.quarantine!);if(quarantined.isSymbolicLink()||!quarantined.isFile()||quarantined.dev!==before.dev||quarantined.ino!==before.ino||currentHash(e.quarantine!)!==e.originalHash){if(!existsSync(e.target)){renameSync(e.quarantine!,e.target);syncDir(dirname(e.target));}throw new Error(`install quarantine identity/hash mismatch: ${e.target}`);}}linkSync(e.stage!,e.target);rmSync(e.stage!,{force:true});syncDir(dirname(e.target));if(currentHash(e.target)!==e.newHash)throw new Error(`committed target hash mismatch: ${e.target}`);tx.committed=i+1;tx.phase="targets-committed";writeJournal(tx);transactionFaultForTests?.(`install-target-${i+1}`);}
     atomicWrite(manifestPath(),newManifest);transactionFaultForTests?.("install-manifest-commit");tx.phase="manifest-committed";writeJournal(tx);transactionFaultForTests?.("install-journal-commit");for(const e of entries)if(e.quarantine&&existsSync(e.quarantine))removeExact(e.quarantine,e.originalHash!,"committed quarantine");removeJournal();
@@ -222,7 +314,7 @@ function uninstallAdapter(args:any) {
   const expected=new Set(renderAdapter(state.preferences!,state.preferences!.workspace).files.map(f=>f.path));if(selected.some(f=>!expected.has(f.path))||selected.length!==expected.size)throw new Error("managed-file manifest destinations do not match the active client allowlist");
   const token=`UNINSTALL ${sha(JSON.stringify(selected.map(f=>({path:f.path,hash:f.hash}))))}`;if(args.confirmationToken!==token)return {requiresConfirmation:true,confirmationToken:token,files:selected.map(f=>f.path)};
   for(const f of selected)requireExactManaged(f.path,f.hash);
-  const originalManifest=readFileSync(manifestPath(),"utf8"),newManifest=JSON.stringify({schemaVersion:1,files:manifest.files.filter(f=>f.profileKey!==state.preferences!.profileKey),updatedAt:new Date().toISOString()},null,2)+"\n";
+  const originalManifest=readSensitiveText(manifestPath(),"PLUGIN_DATA managed-files.json"),newManifest=JSON.stringify({schemaVersion:1,files:manifest.files.filter(f=>f.profileKey!==state.preferences!.profileKey),updatedAt:new Date().toISOString()},null,2)+"\n";
   const entries:TxEntry[]=selected.map(f=>({target:f.path,quarantine:join(dirname(f.path),`.${basename(f.path)}.${randomUUID()}.quarantine`),newHash:"",originalHash:f.hash}));const tx:TransactionJournal={schemaVersion:1,operation:"uninstall",phase:"prepared",committed:0,entries,manifestExisted:true,originalManifest,newManifest,profileKey:state.preferences!.profileKey};writeJournal(tx);
   try{for(let i=0;i<entries.length;i++){const e=entries[i]!;assertNoSymlinkPath(e.target,state.preferences!.scope==="project"?state.preferences!.workspace:realpathSync(homedir()));if(currentHash(e.target)!==e.originalHash)throw new Error(`managed file changed before uninstall commit: ${e.target}`);const before=lstatSync(e.target);transactionFaultForTests?.(`uninstall-before-quarantine-${i+1}`);if(existsSync(e.quarantine!))throw new Error(`quarantine conflict: ${e.quarantine}`);renameSync(e.target,e.quarantine!);syncDir(dirname(e.target));const quarantined=lstatSync(e.quarantine!);if(quarantined.isSymbolicLink()||!quarantined.isFile()||quarantined.dev!==before.dev||quarantined.ino!==before.ino||currentHash(e.quarantine!)!==e.originalHash){if(!existsSync(e.target)){renameSync(e.quarantine!,e.target);syncDir(dirname(e.target));}throw new Error(`uninstall quarantine identity/hash mismatch: ${e.target}`);}tx.committed=i+1;tx.phase="targets-committed";writeJournal(tx);transactionFaultForTests?.(`uninstall-target-${i+1}`);}atomicWrite(manifestPath(),newManifest);transactionFaultForTests?.("uninstall-manifest-commit");tx.phase="manifest-committed";writeJournal(tx);transactionFaultForTests?.("uninstall-journal-commit");for(const e of entries)if(e.quarantine&&existsSync(e.quarantine))removeExact(e.quarantine,e.originalHash!,"committed quarantine");removeJournal();}
   catch(error){if((error instanceof Error&&error.message==="__SIMULATED_CRASH__")||tx.phase==="manifest-committed")throw error;try{rollbackUninstall(tx);}catch(rollback){throw new Error(`${String(error)}; rollback incomplete: ${String(rollback)}`);}throw error;}
@@ -241,8 +333,8 @@ function savePreferences(args:any) {
   const profileKey=`${args.client}:${args.scope}:${workspace}`;
   const candidate:any={schemaVersion:1,client:args.client,scope:args.scope,orchestrator:{model:"inherit",...(args.orchestrator?.recommendation?{recommendation:{model:args.orchestrator.recommendation.model,...(args.orchestrator.recommendation.effort!==undefined?{effort:args.orchestrator.recommendation.effort}:{})}}:{})},roles:{routine:{model:args.roles?.routine?.model,...(args.roles?.routine?.effort!==undefined?{effort:args.roles.routine.effort}:{}),...(args.roles?.routine?.readonly!==undefined?{readonly:args.roles.routine.readonly}:{})},high:{model:args.roles?.high?.model,...(args.roles?.high?.effort!==undefined?{effort:args.roles.high.effort}:{}),...(args.roles?.high?.readonly!==undefined?{readonly:args.roles.high.readonly}:{})},advisor:{model:args.roles?.advisor?.model,...(args.roles?.advisor?.effort!==undefined?{effort:args.roles.advisor.effort}:{}),readonly:true}},fallbackPolicy:"fail-closed",fallbacks:[],...(args.appTaskLane?.enabled===true?{appTaskLane:{enabled:true,model:"gpt-5.6-luna",effort:"max"}}:{}),profileKey,workspace,createdAt:existing.preferences?.profileKey===profileKey?existing.preferences.createdAt:now,updatedAt:now,pluginVersion:"0.5.0"};
   const errors=validatePreferences(candidate); if(errors.length) throw new Error(errors.join("; "));
-  if(existsSync(configPath())) { const privateBackups=backupDir(),backup=join(privateBackups,`${Date.now()}-config.json.bak`);if(dirname(backup)!==backupDir())throw new Error("config backup destination changed");copyFileSync(configPath(),backup);chmodSync(backup,0o600);syncFile(backup);syncDir(privateBackups); }
-  let profiles:Record<string,Preferences>={}; try { const old:any=readJson(configPath()); if(old?.schemaVersion===1&&old.profiles&&typeof old.profiles==="object") profiles=old.profiles; } catch {}
+  if(existsSync(configPath())) { assertPrivateFile(configPath(),"PLUGIN_DATA config.json");const privateBackups=backupDir(),backup=join(privateBackups,`${Date.now()}-config.json.bak`);if(dirname(backup)!==privateBackups)throw new Error("config backup destination changed");copyPrivateBackup(configPath(),backup,"PLUGIN_DATA configuration backup"); }
+  let profiles:Record<string,Preferences>={}; try { const old:any=readJson(configPath(),"PLUGIN_DATA config.json"); if(old?.schemaVersion===1&&old.profiles&&typeof old.profiles==="object") profiles=old.profiles; } catch {}
   profiles[profileKey]=candidate; atomicWrite(configPath(),JSON.stringify({schemaVersion:1,activeProfile:profileKey,profiles},null,2)+"\n"); return {saved:true,profileKey,preferences:candidate};
 }
 function resetConfiguration(args:any) { const live=loadManifest().files; if(live.length) throw new Error("reset refused while managed adapter files are installed; uninstall them first"); const token="RESET SOL ADVISOR CONFIGURATION"; if(args.confirmationToken!==token) return {requiresConfirmation:true,confirmationToken:token}; for(const path of [configPath(),manifestPath(),join(dataDir(),"backups")]) if(existsSync(path)) rmSync(path,{recursive:true,force:true}); previewPlans.clear(); return {reset:true,purged:true}; }
@@ -259,7 +351,10 @@ export const tools = [
   {name:"validate_configuration",description:"Validate setup and optionally renderability",inputSchema:objectSchema({workspace:str})},
   {name:"reset_configuration",description:"Reset logical configuration with exact confirmation",inputSchema:objectSchema({confirmationToken:str})}
 ];
+let activeWindowsAclChecks:Set<string>|undefined;
 export async function callTool(name:string,args:any={}) {
+ const previousAclChecks=activeWindowsAclChecks;if(platform()==="win32")activeWindowsAclChecks=new Set();
+ try{
   const allowed:Record<string,string[]>={get_setup_status:[],get_preferences:[],save_preferences:["client","scope","workspace","orchestrator","roles","appTaskLane"],render_client_adapter:["workspace"],install_client_adapter:["workspace","confirmationToken","userScopeConfirmationToken"],uninstall_client_adapter:["confirmationToken"],validate_configuration:["workspace"],reset_configuration:["confirmationToken"]};
   if(!(name in allowed)) throw new Error(`unknown tool: ${name}`); rejectUnknown(args,allowed[name]!,name); recoverTransaction();
   if(name!=="save_preferences") for(const [key,value] of Object.entries(args)) if(typeof value==="string"&&/[\r\n\0]/.test(value)) throw new Error(`${key} contains control characters`);
@@ -272,6 +367,7 @@ export async function callTool(name:string,args:any={}) {
   if(name==="validate_configuration") { const s=configState(); return {status:s.status,valid:s.status==="ready",detail:s.detail,...(s.status==="ready"&&args.workspace?{preview:renderAdapter(s.preferences!,args.workspace)}:{})}; }
   if(name==="reset_configuration") return resetConfiguration(args);
   throw new Error(`unknown tool: ${name}`);
+ }finally{activeWindowsAclChecks=previousAclChecks;}
 }
 function response(id:unknown,result?:unknown,error?:unknown,code=-32000){ return error?{jsonrpc:"2.0",id,error:{code,message:error instanceof Error?error.message:String(error)}}:{jsonrpc:"2.0",id,result}; }
 export async function handle(message:any){
