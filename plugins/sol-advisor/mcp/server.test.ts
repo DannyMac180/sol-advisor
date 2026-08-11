@@ -12,6 +12,12 @@ const windowsRoot=process.env.SystemRoot??process.env.WINDIR??(process.env.Syste
 const windowsPowerShell=join(windowsRoot,"System32","WindowsPowerShell","v1.0","powershell.exe");
 const icacls=join(windowsRoot,"System32","icacls.exe");
 const windowsUsersSid="*S-1-5-32-545";
+const codexSandboxGroup="CodexSandboxUsers";
+function windowsLocalGroupSid(name:string){
+ if(process.platform!=="win32")return undefined;
+ try{return execFileSync(windowsPowerShell,["-NoLogo","-NoProfile","-NonInteractive","-Command",'$account=[Security.Principal.NTAccount]::new([Environment]::MachineName,$env:SOL_ADVISOR_TEST_GROUP);$account.Translate([Security.Principal.SecurityIdentifier]).Value'],{encoding:"utf8",env:{...process.env,SOL_ADVISOR_TEST_GROUP:name}}).trim()||undefined;}
+ catch{return undefined;}
+}
 function makePrivate(path:string){
  if(process.platform!=="win32"){chmodSync(path,0o700);return;}
  const sid=execFileSync(windowsPowerShell,["-NoLogo","-NoProfile","-NonInteractive","-Command","[Security.Principal.WindowsIdentity]::GetCurrent().User.Value"],{encoding:"utf8"}).trim();
@@ -76,6 +82,40 @@ describe("PLUGIN_DATA boundary",()=>{
   try{await expect(callTool("get_setup_status")).rejects.toThrow("owner is outside the approved Windows principals");}
   finally{process.env.PLUGIN_DATA=data;}
  });
+ test("accepts only read and execute for the exact local Codex sandbox group",async()=>{
+  if(process.platform!=="win32")return;
+  let sid=windowsLocalGroupSid(codexSandboxGroup),created=false;
+  try{
+   if(!sid){
+    await expect(callTool("get_setup_status")).resolves.toBeTruthy();
+    if(process.env.CI!=="true")return;
+    execFileSync(windowsPowerShell,["-NoLogo","-NoProfile","-NonInteractive","-Command",'New-LocalGroup -Name $env:SOL_ADVISOR_TEST_GROUP -Description "Codex sandbox internal group (managed)" | Out-Null'],{env:{...process.env,SOL_ADVISOR_TEST_GROUP:codexSandboxGroup}});created=true;
+    sid=windowsLocalGroupSid(codexSandboxGroup);expect(sid).toBeTruthy();
+   }
+   const principal=`*${sid}`;
+   execFileSync(icacls,[data,"/grant:r",`${principal}:(OI)(CI)RX`]);
+   await expect(callTool("get_setup_status")).resolves.toBeTruthy();
+   await callTool("save_preferences",base());
+   expect((await callTool("get_setup_status") as any).status).toBe("ready");
+   const validation:any=await callTool("validate_configuration",{workspace});expect(validation.valid).toBe(true);expect(validation.preview.files).toHaveLength(3);
+   let preview:any=await callTool("render_client_adapter",{workspace});
+   __setManifestWriteFaultForTests(point=>{if(point==="install-target-1")throw new Error("__SIMULATED_CRASH__")});
+   await expect(callTool("install_client_adapter",{workspace,confirmationToken:preview.confirmationToken})).rejects.toThrow("SIMULATED_CRASH");
+   __setManifestWriteFaultForTests(undefined);expect((await callTool("get_setup_status") as any).status).toBe("ready");
+   preview=await callTool("render_client_adapter",{workspace});await callTool("install_client_adapter",{workspace,confirmationToken:preview.confirmationToken});
+   expect((await callTool("uninstall_client_adapter",{}) as any).requiresConfirmation).toBe(true);
+   await callTool("save_preferences",base());await callTool("save_preferences",base());
+   for(const rights of ["M","F"]){
+    execFileSync(icacls,[data,"/grant:r",`${principal}:(OI)(CI)${rights}`]);__resetDataPinForTests();
+    await expect(callTool("get_setup_status")).rejects.toThrow("CodexSandboxUsers");
+    execFileSync(icacls,[data,"/grant:r",`${principal}:(OI)(CI)RX`]);__resetDataPinForTests();
+    expect((await callTool("get_setup_status") as any).status).toBe("ready");
+   }
+  }finally{
+   __setManifestWriteFaultForTests(undefined);makePrivate(data);
+   if(created)execFileSync(windowsPowerShell,["-NoLogo","-NoProfile","-NonInteractive","-Command","Remove-LocalGroup -Name $env:SOL_ADVISOR_TEST_GROUP"],{env:{...process.env,SOL_ADVISOR_TEST_GROUP:codexSandboxGroup}});
+  }
+ },90_000);
 });
 
 describe("configuration",()=>{

@@ -57,10 +57,24 @@ $allowed = @(
   "S-1-3-0",
   "S-1-3-4"
 )
+$codexSandboxUsers = $null
+try {
+  $codexSandboxUsers = [Security.Principal.NTAccount]::new(
+    [Environment]::MachineName,
+    "CodexSandboxUsers"
+  ).Translate([Security.Principal.SecurityIdentifier]).Value
+} catch [Security.Principal.IdentityNotMappedException] {}
+$codexReadExecute = [int]([Security.AccessControl.FileSystemRights]::ReadAndExecute -bor [Security.AccessControl.FileSystemRights]::Synchronize)
 foreach ($entry in $security.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
   if ($entry.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) { continue }
   $sid = $entry.IdentityReference.Value
-  if ($allowed -notcontains $sid) { Write-Output "unsafe-access"; exit 0 }
+  if ($allowed -contains $sid) { continue }
+  if ($null -ne $codexSandboxUsers -and $sid -eq $codexSandboxUsers) {
+    $rights = [int]$entry.FileSystemRights
+    if (($rights -band (-bnot $codexReadExecute)) -eq 0) { continue }
+    Write-Output "unsafe-codex-access"; exit 0
+  }
+  Write-Output "unsafe-access"; exit 0
 }
 Write-Output "private"
 `;
@@ -86,7 +100,7 @@ function assertPrivateWindowsPath(path:string,label:string,kind:WindowsAclKind){
     throw new Error(`${label} ACL could not be verified (${code})`);
   }
   if(result!=="private"){
-    const reason=result==="unsafe-owner"?"owner is outside the approved Windows principals":result==="unsafe-null-dacl"?"null DACL grants unrestricted access":result==="unsafe-access"?"ACL contains an unapproved allow ACE":"Windows ACL verification returned an unexpected result";
+    const reason=result==="unsafe-owner"?"owner is outside the approved Windows principals":result==="unsafe-null-dacl"?"null DACL grants unrestricted access":result==="unsafe-codex-access"?"CodexSandboxUsers allow ACE exceeds read/execute":result==="unsafe-access"?"ACL contains an unapproved allow ACE":"Windows ACL verification returned an unexpected result";
     throw new Error(`${label} must be private (${reason})`);
   }
   activeWindowsAclChecks?.add(cacheKey);
