@@ -30,7 +30,7 @@
     "websiteURL": "https://github.com/DannyMac180/sol-advisor",
     "defaultPrompt": [
       "Use Sol Advisor's native lane to build this feature, verify it, and obtain the fresh Sol review before completion.",
-      "Use the Luna task lane only when I explicitly authorize it; create user-visible GPT-5.6 Luna / Max tasks through Codex app task tools and keep primary review and acceptance in this task."
+      "Use the Luna task lane only if I explicitly authorize it; create visible GPT-5.6 Luna / Max tasks via Codex app tools."
     ]
   }
 }

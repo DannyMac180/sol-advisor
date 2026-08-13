@@ -65,6 +65,12 @@ reasoning level; this installed custom-agent profile is the required routine lan
 EOF
 cp "$templates/$sol_file" "$target/$sol_file"; test "$(shasum -a 256 "$target/$terra_file" | awk '{print $1}')" = "$legacy_terra_sha256" || fail "legacy Terra fixture digest drifted"; test "$(shasum -a 256 "$target/$luna_file" | awk '{print $1}')" = "$legacy_luna_sha256" || fail "legacy Luna fixture digest drifted"; }
 test "$(jq -r .version "$manifest")" = "0.6.0" || fail "manifest version is not 0.6.0"
+if ! jq -e '
+  (.interface.defaultPrompt | type == "array") and
+  all(.interface.defaultPrompt[]; type == "string" and length <= 128)
+' "$manifest" >/dev/null; then
+  fail ".codex-plugin interface.defaultPrompt entries must be strings of at most 128 characters"
+fi
 test "$(jq -r .version "$plugin_dir/plugin.json")" = "0.6.0" || fail "canonical manifest version is not 0.6.0"
 test "$(node -p "require('$repo_dir/package.json').version")" = "0.6.0" || fail "package version is not 0.6.0"
 test -f "$plugin_dir/skills/routing/SKILL.md" || fail "routing skill is missing"
