@@ -218,10 +218,11 @@ documented plugin manager or UI. No cross-client plugin-uninstall command is ass
 ## MCP tools
 
 The server implements `initialize`, `ping`, `tools/list`, and `tools/call` over
-newline-delimited JSON-RPC. Its tools are:
+newline-delimited JSON-RPC. Its nine tools are:
 
 - `get_setup_status`
 - `get_preferences`
+- `resolve_route`
 - `save_preferences`
 - `render_client_adapter`
 - `install_client_adapter`
@@ -236,16 +237,19 @@ No credentials belong in plugin configuration.
 ## Orchestration semantics
 
 The parent owns the specification, architecture, decomposition, actual diff review,
-rerun verification, correction loops, and acceptance. Routine versus high routing is
-based on task complexity, never price alone. Worker reports are claims until the
-parent verifies the working tree and checks. The advisor remains behaviorally
-read-only unless the client exposes evidence of OS-enforced isolation; Sol Advisor
-reports the observed guarantee rather than inventing one.
+rerun verification, correction loops, and acceptance. Worker reports are claims until
+the parent verifies the working tree and checks. The five task classes route as
+follows: routine to `routine`; medium to the `high` compatibility storage role; hard
+to `hard`; and planning or review to `advisor`. The parent runs a route only when its
+current evidence is exact and the task is not review. Any route change requires a
+fresh exact agent. Reviews are always fresh and read-only, with runtime evidence
+required before use. Sol Advisor reports the observed guarantee rather than inventing
+one.
 
-The historical exact Codex native lane remains compatible: separately installed
-Terra / High implementation and a fresh Sol / High reviewer. It does not use a Luna
-custom-agent TOML. The Luna lane instead uses app task tools and is outside native
-subagent V2.
+The historical exact Codex native compatibility lane remains separate: it uses a
+separately installed Terra / High implementer and a fresh Sol / High reviewer. It
+does not use a Luna custom-agent TOML. The Luna lane instead uses app task tools and
+is outside native subagent V2.
 
 | Mode | Worker | Parent ownership |
 |---|---|---|

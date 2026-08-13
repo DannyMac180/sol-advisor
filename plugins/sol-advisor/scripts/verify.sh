@@ -129,15 +129,44 @@ printf '%s\n' \
   > "$agent_file"
 agent_output=$(CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" "$agent_id")
 printf '%s\n' "$agent_output" | jq -e --arg id "$agent_id" '.thread_id==$id and .evidence_source=="codex-rollout-inspector" and .execution_context=="agent" and .agent_identifier=="sol_advisor_routine"' >/dev/null || fail "runtime inspector agent evidence is incorrect"
+mixed_parent_id=33333333-3333-7333-8333-333333333333
+mixed_parent_file=$runtime_home/sessions/2026/08/13/rollout-2026-08-13T00-00-00-$mixed_parent_id.jsonl
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_parent_id\"}}" \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_parent_id\",\"parent_thread_id\":\"$runtime_id\",\"agent_role\":\"sol_advisor_routine\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
+  > "$mixed_parent_file"
+if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" "$mixed_parent_id" >/dev/null 2>&1; then fail "runtime inspector accepted mixed parent-thread provenance"; fi
+mixed_role_id=44444444-4444-7444-8444-444444444444
+mixed_role_file=$runtime_home/sessions/2026/08/13/rollout-2026-08-13T00-00-00-$mixed_role_id.jsonl
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_role_id\",\"parent_thread_id\":\"$runtime_id\",\"agent_role\":\"sol_advisor_routine\"}}" \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_role_id\",\"parent_thread_id\":\"$runtime_id\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
+  > "$mixed_role_file"
+if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" "$mixed_role_id" >/dev/null 2>&1; then fail "runtime inspector accepted mixed agent-role provenance"; fi
+parent_role_id=55555555-5555-7555-8555-555555555555
+parent_role_file=$runtime_home/sessions/2026/08/13/rollout-2026-08-13T00-00-00-$parent_role_id.jsonl
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$parent_role_id\",\"agent_role\":\"sol_advisor_routine\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
+  > "$parent_role_file"
+if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" "$parent_role_id" >/dev/null 2>&1; then fail "runtime inspector accepted parent metadata with an agent role"; fi
 if printf '%s\n' "$runtime_output" | grep -Fq DO_NOT_LEAK; then fail "runtime inspector leaked prompt canary"; fi
 if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --sessions-dir "$runtime_home" "$runtime_id" >/dev/null 2>&1; then fail "runtime inspector accepted an arbitrary path"; fi
-pass "pathless aggregate runtime inspection and prompt-canary privacy"
+pass "pathless aggregate runtime inspection, provenance rejection, and prompt-canary privacy"
 
 grep -Fq 'currentRuntimeEvidence' "$routing_skill" || fail "routing skill omits current evidence"
 grep -Fq 'targetRuntimeEvidence' "$routing_skill" || fail "routing skill omits target evidence"
 grep -Fq 'fresh_agent' "$routing_skill" || fail "routing skill omits fresh-agent semantics"
+readme_text=$(tr '\n' ' ' < "$readme")
 grep -Fq 'sol-advisor-hard' "$readme" || fail "README omits hard role"
-grep -Fq '9 tools' "$readme" || fail "README tool count is stale"
+grep -Fq 'Its nine tools are:' "$readme" || fail "README tool count is stale"
+grep -Fq -- '- `resolve_route`' "$readme" || fail "README tool list omits route resolver"
+grep -Fq 'routine to `routine`; medium to the `high` compatibility storage role; hard' "$readme" || fail "README class mapping is stale"
+grep -Fq 'and planning or review to `advisor`.' "$readme" || fail "README advisor class mapping is stale"
+printf '%s\n' "$readme_text" | grep -Fq 'Any route change requires a fresh exact agent.' || fail "README fresh-route rule is stale"
+grep -Fq 'Reviews are always fresh and read-only' "$readme" || fail "README review rule is stale"
 if grep -Eq 'all eight tools|these eight enabled tools' "$readme"; then fail "README stale eight-tool wording remains"; fi
 grep -Fq 'four generated files' "$readme" || fail "README generated-file count is stale"
 pass "four-role MCP/runtime fixture and documentation contracts"

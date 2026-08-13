@@ -66,13 +66,16 @@ jq -ce -s --arg thread_id "$thread_id" '
   if ($sessions | length) == 0 or ($turns | length) == 0 then error("missing runtime evidence") else
     ($sessions | map(.id) | unique) as $ids |
     if $ids != [$thread_id] then error("session metadata does not match requested thread") else
-    (if ($sessions | any(.parent_thread_id? != null)) then "agent" else "parent" end) as $context |
-    (if $context == "agent" then ($sessions | map(.agent_role) | consistent(.; "agent role")) else null end) as $role |
+    ($sessions | if (all(.parent_thread_id? == null) and all(.agent_role? == null)) then
+      {context:"parent",role:null}
+    elif (all(.parent_thread_id? != null) and all(.agent_role? | type == "string" and length > 0)) then
+      {context:"agent",role:(map(.agent_role) | consistent(.; "agent role"))}
+    else error("mixed or incomplete session provenance") end) as $provenance |
     ($turns | map(.model) | consistent(.; "model")) as $model |
     ($turns | map(.effort) | consistent(.; "effort")) as $effort |
     ($turns | map(.sandbox_policy.type) | consistent(.; "sandbox policy type")) as $sandbox |
     ($tiers | unique) as $unique_tiers |
     if ($unique_tiers | length) > 1 then error("inconsistent runtime service tier") else
-    {thread_id:$thread_id,evidence_source:"codex-rollout-inspector",execution_context:$context,agent_identifier:$role,model:$model,effort:$effort,sandbox_policy_type:$sandbox,observed_runtime_tier:(if ($unique_tiers | length) == 0 then null else $unique_tiers[0] end),raw_tokens:(if ($raw_tokens | length) == 0 then 0 else ($raw_tokens | max) end),model_rounds:($input_rounds | length),median_input_tokens_per_round:($input_rounds | median),median_input_tokens_first_20:(if ($input_rounds | length) >= 20 then ($input_rounds[:20] | median) else null end),tool_calls:$tool_calls,compactions:$compactions}
+    {thread_id:$thread_id,evidence_source:"codex-rollout-inspector",execution_context:$provenance.context,agent_identifier:$provenance.role,model:$model,effort:$effort,sandbox_policy_type:$sandbox,observed_runtime_tier:(if ($unique_tiers | length) == 0 then null else $unique_tiers[0] end),raw_tokens:(if ($raw_tokens | length) == 0 then 0 else ($raw_tokens | max) end),model_rounds:($input_rounds | length),median_input_tokens_per_round:($input_rounds | median),median_input_tokens_first_20:(if ($input_rounds | length) >= 20 then ($input_rounds[:20] | median) else null end),tool_calls:$tool_calls,compactions:$compactions}
     end end end
 ' "$rollout_file" 2>/dev/null || fail "rollout is missing, ambiguous, invalid, or lacks allowlisted aggregate evidence."
