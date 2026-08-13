@@ -1,5 +1,18 @@
 # Native Codex role contracts
 
+## Schema-v2 general routes
+
+Use `$sol-advisor:routing` and `resolve_route` before a general native route.
+Routine maps to routine, medium maps to the compatibility `high` storage role, hard
+maps to hard, and planning/review map to advisor. Review is always fresh and
+read-only only with observed evidence. Keep `fork_context=false` and parallelism at
+one. Compare configured model/effort/default tier/read-only request separately from
+observed model/effort/requested/saved/observed tier evidence. A migrated hard route is
+pending until four-role consent and fresh runtime discovery both pass. Fast is one
+bounded Luna/max routine route only; it requests priority tier and restarts at
+Luna/default if work expands. Do not substitute the static Terra/Sol compatibility
+aliases for a blocked route.
+
 Use these contracts with Sol Advisor's namespaced, role-pinned native custom agents.
 They do not launch a nested Codex CLI or change global default-subagent routing. The
 separate [Luna task-lane contract](luna-task-lane.md) covers user-visible app tasks;

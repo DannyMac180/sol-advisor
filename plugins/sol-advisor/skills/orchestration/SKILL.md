@@ -1,6 +1,6 @@
 ---
 name: orchestration
-description: "Configurable cross-client architect workflow that inherits the parent model, loads saved exact native role preferences, routes routine versus high-complexity implementation, preserves the separate opt-in Luna app-task lane, and keeps parent verification and acceptance."
+description: "Architect workflow that uses schema-v2 route resolution, preserves the separate opt-in Luna app-task lane, and keeps parent verification and acceptance."
 ---
 
 # Sol Advisor Orchestration
@@ -18,12 +18,12 @@ and never claim it was changed. Sol / High is a recommendation only. Exact nativ
 role model IDs and supported reasoning settings come from saved preferences. There is
 no silent fallback, translation, guessed role, or universal model enumeration.
 
-Select the routine implementer for bounded mechanical changes, boilerplate, wiring,
-and fully specified work. Select the high-complexity implementer for security-sensitive
-logic, concurrency, non-trivial algorithms, difficult debugging, migrations, or
-wide-blast-radius refactors. Invoke the exact installed native role names produced by
-the confirmed client adapter. The advisor remains behaviorally read-only and its
-actual sandbox guarantee must be reported from client evidence, not inferred.
+Use `$sol-advisor:routing` and `resolve_route` for every general route. The five
+classes are routine, medium, hard, planning, and review. Medium maps to the retained
+`roles.high` storage role; planning and review use advisor, and review is always a
+fresh read-only agent only when observed evidence proves that state. A blocked route,
+missing runtime evidence, unavailable model, unsupported effort, or disagreement
+between requested, saved, and observed tier stops the lane without fallback.
 
 On ChatGPT Work web, Kiro web/mobile, and skills-only surfaces without enforceable
 native role bindings, use the stored preferences as prompt guidance only and state
@@ -64,13 +64,11 @@ the parent selection.
 
 ## Choose a lane
 
-Use the configured native adapter by default when its exact three roles are
-observable. Invoke the exact generated frontmatter/native name: Codex uses
-`sol_advisor_routine`, `sol_advisor_high`, and `sol_advisor_advisor`; Cursor, VS Code,
-GitHub Copilot, and Kiro use `sol-advisor-routine`, `sol-advisor-high`, and
-`sol-advisor-advisor`. Never prescribe Codex identifiers cross-client. Role files,
-not per-spawn guesses, carry client-native model settings. Report routing or sandbox
-evidence only when exposed by the host.
+Use the configured four-role adapter only after its exact preview/install lifecycle
+and fresh runtime evidence pass. Codex uses `sol_advisor_routine`,
+`sol_advisor_high`, `sol_advisor_hard`, and `sol_advisor_advisor`; other clients
+use the matching hyphenated identifiers. The static Terra implementer and Sol reviewer
+remain compatibility aliases, not a substitute for a blocked general route.
 
 The retained exact Codex compatibility lane may still use its separately installed
 `sol_advisor_terra_implementer` and `sol_advisor_sol_reviewer` profiles and the legacy

@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { __resetDataPinForTests, __setManifestWriteFaultForTests, callTool, handle, renderAdapter } from "./server";
 
 let root="", data="", workspace="";
-const base=(client="codex",scope="project")=>({client,scope,workspace,orchestrator:{model:"inherit",recommendation:{model:"gpt-5.6-sol",effort:"high"}},roles:{routine:{model:"gpt-5.6-terra",...(client==="codex"||client==="cursor"?{effort:"high"}:{})},high:{model:"gpt-5.6-terra",...(client==="codex"||client==="cursor"?{effort:"high"}:{})},advisor:{model:"gpt-5.6-sol",...(client==="codex"||client==="cursor"?{effort:"high"}:{}),readonly:true}}});
+const base=(client="codex",scope="project")=>({client,scope,workspace,orchestrator:{model:"inherit",recommendation:{model:"gpt-5.6-sol",effort:"high"}},roles:{routine:{model:"gpt-5.6-luna",...(client==="codex"||client==="cursor"?{effort:"max"}:{})},high:{model:"gpt-5.6-terra",...(client==="codex"||client==="cursor"?{effort:"high"}:{})},hard:{model:"gpt-5.6-sol",...(client==="codex"||client==="cursor"?{effort:"high"}:{})},advisor:{model:"gpt-5.6-sol",...(client==="codex"||client==="cursor"?{effort:"high"}:{}),readonly:true}}});
+const parentEvidence=(model:string,effort:string,sandboxPolicyType="danger-full-access",observedRuntimeTier:"default"|"priority"|null="default")=>({evidenceSource:"codex-rollout-inspector" as const,executionContext:"parent" as const,agentIdentifier:null,model,effort,observedRuntimeTier,sandboxPolicyType});
+const agentEvidence=(agentIdentifier:string,model:string,effort:string,sandboxPolicyType="danger-full-access",observedRuntimeTier:"default"|"priority"|null="default")=>({evidenceSource:"codex-rollout-inspector" as const,executionContext:"agent" as const,agentIdentifier,model,effort,observedRuntimeTier,sandboxPolicyType});
 beforeEach(()=>{__resetDataPinForTests();root=realpathSync(mkdtempSync(join(tmpdir(),"sol-advisor-test-")));data=join(root,"data");workspace=join(root,"work");mkdirSync(data);chmodSync(data,0o700);mkdirSync(workspace);process.env.PLUGIN_DATA=data;});
 afterEach(()=>{__setManifestWriteFaultForTests(undefined);__resetDataPinForTests();delete process.env.PLUGIN_DATA;rmSync(root,{recursive:true,force:true});});
 
@@ -14,7 +16,7 @@ describe("MCP protocol",()=>{
   expect((await handle({jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"x"}}))?.result.serverInfo.name).toBe("sol-advisor");
   expect((await handle({jsonrpc:"2.0",id:10,method:"initialize",params:{protocolVersion:"unknown-future"}}))?.result.protocolVersion).toBe("2025-03-26");
   expect((await handle({jsonrpc:"2.0",id:2,method:"ping"}))?.result).toEqual({});
-  expect((await handle({jsonrpc:"2.0",id:3,method:"tools/list"}))?.result.tools).toHaveLength(8);
+  expect((await handle({jsonrpc:"2.0",id:3,method:"tools/list"}))?.result.tools).toHaveLength(9);
   expect((await handle({jsonrpc:"2.0",id:4,method:"nope"}))?.error.message).toContain("method not found");
   expect((await handle({jsonrpc:"2.0",id:5,method:"nope"}))?.error.code).toBe(-32601);
   expect((await handle({jsonrpc:"2.0",id:6,method:"tools/call",params:{}}))?.error.code).toBe(-32602);
@@ -79,21 +81,78 @@ describe("configuration",()=>{
  test("preexisting backups symlink is rejected without external writes",async()=>{
   await callTool("save_preferences",base());const external=join(root,"external-backups");mkdirSync(external);symlinkSync(external,join(data,"backups"));await expect(callTool("save_preferences",base())).rejects.toThrow("backups must be a real directory");expect(existsSync(join(external,"config.json.bak"))).toBe(false);expect(readdirSync(external)).toHaveLength(0);
  });
+ test("atomically migrates v1 profiles once and leaves hard pending consent",async()=>{
+  const old:any=base();delete old.roles.hard;
+  const profileKey=`codex:project:${workspace}`,legacy={schemaVersion:1,client:"codex",scope:"project",workspace,orchestrator:old.orchestrator,roles:old.roles,fallbackPolicy:"fail-closed",fallbacks:[],profileKey,createdAt:"x",updatedAt:"x",pluginVersion:"0.5.0"};
+  writeFileSync(join(data,"config.json"),JSON.stringify({schemaVersion:1,activeProfile:profileKey,profiles:{[profileKey]:legacy}}));
+  expect((await callTool("get_setup_status") as any).status).toBe("ready");
+  const migrated=JSON.parse(readFileSync(join(data,"config.json"),"utf8"));expect(migrated.schemaVersion).toBe(2);expect(migrated.profiles[profileKey].roles.hard).toMatchObject({model:"gpt-5.6-sol",effort:"high",machineTier:"default"});expect(migrated.profiles[profileKey].hardRoute.status).toBe("pending-consent");
+  const once=readFileSync(join(data,"config.json"),"utf8");await callTool("get_setup_status");expect(readFileSync(join(data,"config.json"),"utf8")).toBe(once);
+ });
+ test("keeps a recorded v0.5 three-file adapter exactly uninstallable after migration",async()=>{
+  const old:any=base();delete old.roles.hard;const profileKey=`codex:project:${workspace}`,legacy={schemaVersion:1,client:"codex",scope:"project",workspace,orchestrator:old.orchestrator,roles:old.roles,fallbackPolicy:"fail-closed",fallbacks:[],profileKey,createdAt:"x",updatedAt:"x",pluginVersion:"0.5.0"};
+  writeFileSync(join(data,"config.json"),JSON.stringify({schemaVersion:1,activeProfile:profileKey,profiles:{[profileKey]:legacy}}));await callTool("get_setup_status");
+  const names=["routine","high","advisor"],dir=join(workspace,".codex","agents");mkdirSync(dir,{recursive:true});const files=names.map(name=>{const path=join(dir,`sol-advisor-${name}.toml`),content=`# sol-advisor-managed:v1\nlegacy-${name}\n`;writeFileSync(path,content);return {profileKey,path,hash:new Bun.CryptoHasher("sha256").update(content).digest("hex")};});writeFileSync(join(data,"managed-files.json"),JSON.stringify({schemaVersion:1,files,updatedAt:"x"}));
+  const ask:any=await callTool("uninstall_client_adapter",{});const removed:any=await callTool("uninstall_client_adapter",{confirmationToken:ask.confirmationToken});expect(removed.removed).toHaveLength(3);expect(files.every(file=>!existsSync(file.path))).toBe(true);
+ });
+ test("requires migrated hard consent and fresh exact runtime evidence",async()=>{
+  const old:any=base();delete old.roles.hard;const profileKey=`codex:project:${workspace}`,legacy={schemaVersion:1,client:"codex",scope:"project",workspace,orchestrator:old.orchestrator,roles:old.roles,fallbackPolicy:"fail-closed",fallbacks:[],profileKey,createdAt:"x",updatedAt:"x",pluginVersion:"0.5.0"};
+  writeFileSync(join(data,"config.json"),JSON.stringify({schemaVersion:1,activeProfile:profileKey,profiles:{[profileKey]:legacy}}));const preview:any=await callTool("render_client_adapter",{workspace});const current=parentEvidence("gpt-5.6-sol","high"),target=agentEvidence("sol_advisor_hard","gpt-5.6-sol","high");
+  expect((await callTool("resolve_route",{taskClass:"hard",currentRuntimeEvidence:current}) as any).evidenceStatus).toBe("blocked");
+  await expect(callTool("install_client_adapter",{workspace,confirmationToken:preview.confirmationToken})).rejects.toThrow("hard consent");
+  await callTool("install_client_adapter",{workspace,confirmationToken:preview.confirmationToken,hardConsentToken:preview.hardConsentToken});
+  expect((await callTool("resolve_route",{taskClass:"hard",currentRuntimeEvidence:current}) as any).evidenceStatus).toBe("spawn-required");
+  expect((await callTool("resolve_route",{taskClass:"hard",currentRuntimeEvidence:current,targetRuntimeEvidence:target}) as any).evidenceStatus).toBe("verified");expect((await callTool("get_preferences") as any).hardRoute.status).toBe("ready");expect(readdirSync(join(data,"backups")).some(name=>name.endsWith("-config.json.bak"))).toBe(true);
+  expect((await callTool("resolve_route",{taskClass:"hard",currentRuntimeEvidence:current}) as any).executionPlacement).toBe("parent");
+ });
+ test("recovers a real exact three-role v0.5 uninstall crash journal after migration",async()=>{
+  const old:any=base();delete old.roles.hard;const profileKey=`codex:project:${workspace}`,legacy={schemaVersion:1,client:"codex",scope:"project",workspace,orchestrator:old.orchestrator,roles:old.roles,fallbackPolicy:"fail-closed",fallbacks:[],profileKey,createdAt:"x",updatedAt:"x",pluginVersion:"0.5.0"};
+  writeFileSync(join(data,"config.json"),JSON.stringify({schemaVersion:1,activeProfile:profileKey,profiles:{[profileKey]:legacy}}));await callTool("get_setup_status");const dir=join(workspace,".codex","agents");mkdirSync(dir,{recursive:true});const files=["routine","high","advisor"].map(name=>{const path=join(dir,`sol-advisor-${name}.toml`),content=`# sol-advisor-managed:v1\nlegacy-${name}\n`;writeFileSync(path,content);return {profileKey,path,hash:new Bun.CryptoHasher("sha256").update(content).digest("hex"),content};});writeFileSync(join(data,"managed-files.json"),JSON.stringify({schemaVersion:1,files:files.map(({content,...file})=>file),updatedAt:"x"}));
+  const ask:any=await callTool("uninstall_client_adapter",{});__setManifestWriteFaultForTests(point=>{if(point==="uninstall-target-2")throw new Error("__SIMULATED_CRASH__")});await expect(callTool("uninstall_client_adapter",{confirmationToken:ask.confirmationToken})).rejects.toThrow("SIMULATED_CRASH");expect(existsSync(join(data,"transaction.json"))).toBe(true);__setManifestWriteFaultForTests(undefined);expect((await callTool("get_setup_status") as any).status).toBe("ready");for(const file of files)expect(readFileSync(file.path,"utf8")).toBe(file.content);expect(JSON.parse(readFileSync(join(data,"managed-files.json"),"utf8")).files).toHaveLength(3);
+ });
 
+});
+
+describe("route resolution",()=>{
+ test("stays parent only for an exact non-review route and otherwise requires a fresh exact target",async()=>{
+  await callTool("save_preferences",base());const current=(model:string,effort:string,sandboxPolicyType="danger-full-access")=>parentEvidence(model,effort,sandboxPolicyType);
+  const routine:any=await callTool("resolve_route",{taskClass:"routine",currentRuntimeEvidence:current("gpt-5.6-luna","max")});expect(routine).toMatchObject({executionPlacement:"parent",evidenceStatus:"verified",escalated:false,savedMachineTier:"default",observedRuntimeTier:"default"});
+  const changed:any=await callTool("resolve_route",{taskClass:"hard",currentRuntimeEvidence:current("gpt-5.6-luna","max")});expect(changed).toMatchObject({executionPlacement:"fresh_agent",evidenceStatus:"spawn-required",escalated:true});
+  const hard:any=await callTool("resolve_route",{taskClass:"hard",currentRuntimeEvidence:current("gpt-5.6-luna","max"),targetRuntimeEvidence:agentEvidence("sol_advisor_hard","gpt-5.6-sol","high")});expect(hard).toMatchObject({evidenceStatus:"verified",executionPlacement:"fresh_agent",escalated:true});
+  const review:any=await callTool("resolve_route",{taskClass:"review",currentRuntimeEvidence:current("gpt-5.6-sol","high","read-only")});expect(review).toMatchObject({executionPlacement:"fresh_agent",evidenceStatus:"spawn-required",escalated:true});
+ });
+ test("guards Fast, exact evidence, and nested direct-call fields",async()=>{
+  await callTool("save_preferences",base());const current=parentEvidence("gpt-5.6-luna","max","danger-full-access","priority");
+  expect((await callTool("resolve_route",{taskClass:"routine",machineTier:"fast",currentRuntimeEvidence:current}) as any).blockedReason).toContain("bounded");
+  expect((await callTool("resolve_route",{taskClass:"routine",machineTier:"fast",fastOverride:{bounded:true,oneRoute:true},currentRuntimeEvidence:{...current,observedRuntimeTier:null}}) as any).evidenceStatus).toBe("spawn-required");
+  expect((await callTool("resolve_route",{taskClass:"routine",machineTier:"fast",fastOverride:{bounded:true,oneRoute:true},currentRuntimeEvidence:current}) as any).budget.toolCalls).toBe(10);
+  await expect(callTool("resolve_route",{taskClass:"routine",currentRuntimeEvidence:{...current,apiToken:"no"}})).rejects.toThrow("forbidden");
+  expect((await callTool("resolve_route",{taskClass:"routine",currentRuntimeEvidence:{...current,agentIdentifier:"sol_advisor_routine"}}) as any).evidenceStatus).toBe("blocked");
+  await expect(callTool("resolve_route",{taskClass:"routine",currentRuntimeEvidence:current,fastOverride:{bounded:true,oneRoute:true,extra:true}})).rejects.toThrow("unknown");
+ });
+ test("keeps cross-client model-only adapters fail-closed on unsupported effort evidence",async()=>{
+  await callTool("save_preferences",base("vscode"));const preview:any=await callTool("render_client_adapter",{workspace});expect(preview.files).toHaveLength(4);
+  const route:any=await callTool("resolve_route",{taskClass:"routine",currentRuntimeEvidence:parentEvidence("gpt-5.6-luna","max","danger-full-access",null)});
+  expect(route).toMatchObject({evidenceStatus:"blocked",blockedReason:"configured effort is unavailable"});
+ });
+ test("keeps selected tiers, planning budget, and writable sandbox evidence distinct",async()=>{
+  await callTool("save_preferences",base());const planning:any=await callTool("resolve_route",{taskClass:"planning",currentRuntimeEvidence:parentEvidence("gpt-5.6-sol","high","read-only")});expect(planning).toMatchObject({executionPlacement:"parent",requestedMachineTier:"default",requestedRuntimeTier:"default",savedMachineTier:"default",observedRuntimeTier:"default",budget:{toolCalls:25,rawTokens:2_500_000,compactions:0}});
+  const fresh:any=await callTool("resolve_route",{taskClass:"hard",currentRuntimeEvidence:parentEvidence("gpt-5.6-luna","max","danger-full-access","priority"),targetRuntimeEvidence:agentEvidence("sol_advisor_hard","gpt-5.6-sol","high","danger-full-access","default")});expect(fresh.observedRuntimeTier).toBe("default");const writableReadonly:any=await callTool("resolve_route",{taskClass:"routine",currentRuntimeEvidence:parentEvidence("gpt-5.6-luna","max","read-only")});expect(writableReadonly.evidenceStatus).toBe("spawn-required");
+ });
 });
 
 describe("adapter rendering and lifecycle",()=>{
  test("renders every client and scope with deterministic exact paths",()=>{
-  for(const client of ["codex","cursor","vscode","github-copilot","kiro"]){for(const scope of ["project","user"]){const p:any=base(client,scope);p.workspace=realpathSync(workspace);p.schemaVersion=1;p.profileKey=`${client}:${scope}:${workspace}`;p.fallbackPolicy="fail-closed";p.fallbacks=[];p.createdAt=p.updatedAt="x";p.pluginVersion="0.5.0";const a=renderAdapter(p,workspace);expect(a.files).toHaveLength(3);expect(a.files.every(f=>f.content.includes("sol-advisor-managed:v1"))).toBe(true);if(client==="cursor")expect(a.warnings.join(" ")).toContain("may fall back");expect(renderAdapter(p,workspace).planDigest).toBe(a.planDigest);}}
+  for(const client of ["codex","cursor","vscode","github-copilot","kiro"]){for(const scope of ["project","user"]){const p:any=base(client,scope);p.workspace=realpathSync(workspace);p.schemaVersion=2;p.profileKey=`${client}:${scope}:${workspace}`;p.fallbackPolicy="fail-closed";p.fallbacks=[];p.hardRoute={status:"ready"};p.createdAt=p.updatedAt="x";p.pluginVersion="0.6.0";for(const role of Object.values(p.roles) as any[])role.machineTier="default";const a=renderAdapter(p,workspace);expect(a.files).toHaveLength(4);expect(a.files.every(f=>f.content.includes("sol-advisor-managed:v1"))).toBe(true);if(client==="cursor")expect(a.warnings.join(" ")).toContain("may fall back");expect(renderAdapter(p,workspace).planDigest).toBe(a.planDigest);}}
  });
  test("requires exact consent, refuses conflict, backs up updates, and uninstalls exact files",async()=>{
   await callTool("save_preferences",base());const preview:any=await callTool("render_client_adapter",{workspace});
   await expect(callTool("install_client_adapter",{workspace,confirmationToken:"yes"})).rejects.toThrow("exact unexpired");
   mkdirSync(join(workspace,".codex","agents"),{recursive:true});writeFileSync(preview.files[0].path,"mine");
   await expect(callTool("install_client_adapter",{workspace,confirmationToken:preview.confirmationToken})).rejects.toThrow("unchanged target state");rmSync(preview.files[0].path);
-  const installed:any=await callTool("install_client_adapter",{workspace,confirmationToken:preview.confirmationToken});expect(installed.installed).toHaveLength(3);
-  await callTool("save_preferences",{...base(),roles:{...(base() as any).roles,routine:{model:"gpt-5.6-terra-2",effort:"high"}}});const p2:any=await callTool("render_client_adapter",{workspace});const updated:any=await callTool("install_client_adapter",{workspace,confirmationToken:p2.confirmationToken});expect(updated.backups.length).toBe(3);
-  const ask:any=await callTool("uninstall_client_adapter",{});expect(ask.requiresConfirmation).toBe(true);const gone:any=await callTool("uninstall_client_adapter",{confirmationToken:ask.confirmationToken});expect(gone.removed).toHaveLength(3);expect(gone.removed.every((x:string)=>!existsSync(x))).toBe(true);
+  const installed:any=await callTool("install_client_adapter",{workspace,confirmationToken:preview.confirmationToken});expect(installed.installed).toHaveLength(4);
+  await callTool("save_preferences",{...base(),roles:{...(base() as any).roles,routine:{model:"gpt-5.6-terra-2",effort:"high"}}});const p2:any=await callTool("render_client_adapter",{workspace});const updated:any=await callTool("install_client_adapter",{workspace,confirmationToken:p2.confirmationToken});expect(updated.backups.length).toBe(4);
+  const ask:any=await callTool("uninstall_client_adapter",{});expect(ask.requiresConfirmation).toBe(true);const gone:any=await callTool("uninstall_client_adapter",{confirmationToken:ask.confirmationToken});expect(gone.removed).toHaveLength(4);expect(gone.removed.every((x:string)=>!existsSync(x))).toBe(true);
  });
  test("refuses traversal, symlink paths, and modified managed uninstall",async()=>{
   await callTool("save_preferences",base());await expect(callTool("render_client_adapter",{workspace:join(workspace,"..","missing")})).rejects.toThrow();
@@ -121,11 +180,11 @@ describe("adapter rendering and lifecycle",()=>{
   await callTool("save_preferences",base());const preview:any=await callTool("render_client_adapter",{workspace});__setManifestWriteFaultForTests(point=>{if(point==="install-before-targets"){mkdirSync(join(workspace,".codex","agents"),{recursive:true});writeFileSync(preview.files[0].path,"ATTACKER")}});await expect(callTool("install_client_adapter",{workspace,confirmationToken:preview.confirmationToken})).rejects.toThrow("rollback incomplete");expect(readFileSync(preview.files[0].path,"utf8")).toBe("ATTACKER");expect(preview.files.slice(1).every((f:any)=>!existsSync(f.path))).toBe(true);
  });
  test("install faults after each target and manifest commit roll back zero partial mutation",async()=>{
-  await callTool("save_preferences",base());for(const fault of ["install-target-1","install-target-2","install-target-3","install-manifest-commit"]){const preview:any=await callTool("render_client_adapter",{workspace});__setManifestWriteFaultForTests(point=>{if(point===fault)throw new Error(`injected ${fault}`)});await expect(callTool("install_client_adapter",{workspace,confirmationToken:preview.confirmationToken})).rejects.toThrow(fault);expect(preview.files.every((f:any)=>!existsSync(f.path))).toBe(true);expect(existsSync(join(data,"managed-files.json"))).toBe(false);expect(existsSync(join(data,"transaction.json"))).toBe(false);}
+  await callTool("save_preferences",base());for(const fault of ["install-target-1","install-target-2","install-target-3","install-target-4","install-manifest-commit"]){const preview:any=await callTool("render_client_adapter",{workspace});__setManifestWriteFaultForTests(point=>{if(point===fault)throw new Error(`injected ${fault}`)});await expect(callTool("install_client_adapter",{workspace,confirmationToken:preview.confirmationToken})).rejects.toThrow(fault);expect(preview.files.every((f:any)=>!existsSync(f.path))).toBe(true);expect(existsSync(join(data,"managed-files.json"))).toBe(false);expect(existsSync(join(data,"transaction.json"))).toBe(false);}
   __setManifestWriteFaultForTests(undefined);
  });
  test("uninstall faults quarantine transaction and restore all files",async()=>{
-  await callTool("save_preferences",base());const preview:any=await callTool("render_client_adapter",{workspace});await callTool("install_client_adapter",{workspace,confirmationToken:preview.confirmationToken});for(const fault of ["uninstall-target-1","uninstall-target-2","uninstall-target-3","uninstall-manifest-commit"]){const ask:any=await callTool("uninstall_client_adapter",{});__setManifestWriteFaultForTests(point=>{if(point===fault)throw new Error(`injected ${fault}`)});await expect(callTool("uninstall_client_adapter",{confirmationToken:ask.confirmationToken})).rejects.toThrow(fault);for(const f of preview.files)expect(readFileSync(f.path,"utf8")).toBe(f.content);expect(JSON.parse(readFileSync(join(data,"managed-files.json"),"utf8")).files).toHaveLength(3);expect(existsSync(join(data,"transaction.json"))).toBe(false);}
+  await callTool("save_preferences",base());const preview:any=await callTool("render_client_adapter",{workspace});await callTool("install_client_adapter",{workspace,confirmationToken:preview.confirmationToken});for(const fault of ["uninstall-target-1","uninstall-target-2","uninstall-target-3","uninstall-target-4","uninstall-manifest-commit"]){const ask:any=await callTool("uninstall_client_adapter",{});__setManifestWriteFaultForTests(point=>{if(point===fault)throw new Error(`injected ${fault}`)});await expect(callTool("uninstall_client_adapter",{confirmationToken:ask.confirmationToken})).rejects.toThrow(fault);for(const f of preview.files)expect(readFileSync(f.path,"utf8")).toBe(f.content);expect(JSON.parse(readFileSync(join(data,"managed-files.json"),"utf8")).files).toHaveLength(4);expect(existsSync(join(data,"transaction.json"))).toBe(false);}
   __setManifestWriteFaultForTests(undefined);
  });
  test("durable journal recovers simulated install and uninstall crashes",async()=>{

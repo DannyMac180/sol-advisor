@@ -10,9 +10,9 @@ and effort.
 
 ## Recent changes
 
-v0.5.0 adds portable first-use setup, a zero-dependency Bun MCP server, configurable
-client-native adapters, safe preview/consent/install/uninstall flows, and fail-closed
-cross-client capability handling. See the full [CHANGELOG.md](https://github.com/DannyMac180/sol-advisor/blob/main/CHANGELOG.md).
+v0.6.0 adds schema-v2 four-role preferences, automatic v1 migration, fail-closed
+runtime-evidence route resolution, bounded Fast, and safe four-role adapter lifecycle.
+See the full [CHANGELOG.md](https://github.com/DannyMac180/sol-advisor/blob/main/CHANGELOG.md).
 
 ## Architecture
 
@@ -24,6 +24,7 @@ The flattened plugin contains:
 - `mcp/server.ts`: newline-delimited JSON-RPC server and configuration/adapter engine.
 - `skills/setup/SKILL.md`: parent-chat first-use and reconfiguration interview.
 - `skills/orchestration/SKILL.md`: architect workflow, routing, and review loops.
+- `skills/routing/SKILL.md`: general routine, medium, hard, planning, and review entrypoint.
 - `agents/` and `scripts/`: retained exact Codex v0.5 compatibility lane.
 
 Plugin installation only makes these surfaces discoverable. It does **not** run setup,
@@ -39,12 +40,13 @@ runtime has no repository-root or third-party runtime dependency.
 ## First-use interview
 
 The interview stays in the parent/main chat and asks for client, project/user scope,
-and three exact client-native model IDs copied from the client's picker or `/model`:
+and four exact client-native model IDs copied from the client's picker or `/model`:
 
 | Role | Purpose | Current Codex recommendation |
 |---|---|---|
-| Routine implementer | Bounded, mechanical, fully specified work | `gpt-5.6-terra`, `high` |
-| High-complexity implementer | Security, concurrency, algorithms, hard debugging, migrations, wide refactors | `gpt-5.6-terra`, `high` |
+| Routine implementer | Bounded, mechanical, fully specified work | `gpt-5.6-luna`, `max` |
+| Medium-compatible high | Medium routine work; stored as `roles.high` | `gpt-5.6-terra`, `high` |
+| Hard implementer | Security, concurrency, algorithms, hard debugging, migrations, wide refactors | `gpt-5.6-sol`, `high` |
 | Advisor | Commitment review and final diff/evidence verdict; requested read-only | `gpt-5.6-sol`, `high` |
 | Orchestrator | Parent ownership and verification | `inherit` (Sol / High recommended) |
 
@@ -72,6 +74,8 @@ Start a new chat, then invoke the workflow explicitly or request orchestration n
 
 ~~~text
 Use $sol-advisor:orchestration to build this feature, verify it, and obtain the configured advisor review before reporting done.
+
+Use $sol-advisor:routing to choose a fail-closed routine, medium, hard, planning, or review route with current runtime evidence.
 ~~~
 
 Update an existing marketplace installation with:
@@ -121,7 +125,7 @@ In Cursor:
    a similarly named repository.
 3. Open `sol-advisor` and enable its workspace source. Cursor keeps new or recreated
    project MCP sources disabled until the user explicitly enables them.
-4. Confirm the local environment is **Connected** and all eight tools are enabled.
+4. Confirm the local environment is **Connected** and all nine tools are enabled.
    If it remains **Disconnected**, or Cursor's shared MCP process leaves every server
    disconnected, fully quit Cursor—not merely the window—reopen the exact workspace,
    return to its Customize scope, and explicitly enable the source again. Do not change
@@ -132,10 +136,10 @@ In Cursor:
    `Run the Sol Advisor setup skill in this parent chat. Use Cursor project scope, ask
    one question at a time, and stop after showing the complete adapter preview.`
 
-Copy exact model IDs from Cursor's model picker. Inspect all three generated files,
+Copy exact model IDs from Cursor's model picker. Inspect all four generated files,
 then repeat the exact `INSTALL <nonce>` token—not a generic “yes.” After installation,
 reload Cursor. The native roles should be invocable as `/sol-advisor-routine`,
-`/sol-advisor-high`, and `/sol-advisor-advisor`.
+`/sol-advisor-high`, `/sol-advisor-hard`, and `/sol-advisor-advisor`.
 
 Before cleanup, use the setup skill to uninstall its generated adapter files and reset
 the active test profile with the required exact tokens. Then run:
@@ -340,9 +344,9 @@ Open the printed folder in Cursor and run **Developer: Reload Window**. Then:
    repository, even if Cursor Agents currently shows it as the active project.
 2. Open `sol-advisor` and explicitly enable its workspace source. Reinstalling or
    recreating `.cursor/mcp.json` can cause Cursor to require this consent again.
-3. Confirm **Local — Connected** and these eight enabled tools:
+3. Confirm **Local — Connected** and these nine enabled tools:
    `get_setup_status`, `get_preferences`, `save_preferences`,
-   `render_client_adapter`, `install_client_adapter`, `uninstall_client_adapter`,
+   `render_client_adapter`, `install_client_adapter`, `uninstall_client_adapter`, `resolve_route`,
    `validate_configuration`, and `reset_configuration`.
 4. If the source remains **Disconnected**, or all MCP servers become disconnected,
    fully quit Cursor, reopen the printed workspace, select its Customize scope again,
@@ -372,12 +376,13 @@ before installation until I repeat the exact token.
 Choose exact model IDs that are currently available to your Cursor account. Where the
 model supports it, choose an effort value such as `high`; the generated Cursor model
 value should use Cursor's documented `model-id[effort=high]` syntax. Before confirming,
-verify that the preview contains only these three destinations and their complete
+verify that the preview contains only these four destinations and their complete
 contents:
 
 ~~~text
 <smoke_dir>/.cursor/agents/sol-advisor-routine.md
 <smoke_dir>/.cursor/agents/sol-advisor-high.md
+<smoke_dir>/.cursor/agents/sol-advisor-hard.md
 <smoke_dir>/.cursor/agents/sol-advisor-advisor.md
 ~~~
 
@@ -386,18 +391,19 @@ In the terminal, confirm preview was non-mutating:
 ~~~sh
 test ! -e "$smoke_dir/.cursor/agents/sol-advisor-routine.md"
 test ! -e "$smoke_dir/.cursor/agents/sol-advisor-high.md"
+test ! -e "$smoke_dir/.cursor/agents/sol-advisor-hard.md"
 test ! -e "$smoke_dir/.cursor/agents/sol-advisor-advisor.md"
 ~~~
 
 Repeat the exact `INSTALL <nonce>` token in chat. Do not use a generic “yes.” Confirm
-all three files now exist, contain `sol-advisor-managed:v1`, and no other file was
+all four files now exist, contain `sol-advisor-managed:v1`, and no other file was
 created under `.cursor/agents`:
 
 ~~~sh
-for name in routine high advisor; do
+for name in routine high hard advisor; do
   test -f "$smoke_dir/.cursor/agents/sol-advisor-$name.md"
 done
-test "$(find "$smoke_dir/.cursor/agents" -maxdepth 1 -type f | wc -l | tr -d ' ')" = 3
+test "$(find "$smoke_dir/.cursor/agents" -maxdepth 1 -type f | wc -l | tr -d ' ')" = 4
 find "$smoke_dir/.cursor/agents" -maxdepth 1 -type f -print -exec grep -H 'sol-advisor-managed:v1' {} \;
 ~~~
 
@@ -412,16 +418,18 @@ subagents support explicit `/name` invocation. Perform these checks:
 2. Invoke `/sol-advisor-high` to append a second known line while checking the file for
    a deliberately described edge case. Confirm its details show the configured high
    role model/options, or record any fallback warning.
-3. Before invoking the advisor, run `advisor_before="$(git -C "$smoke_dir" status --short)"`
+3. Invoke `/sol-advisor-hard` for a bounded migration or concurrency review task. Confirm
+   its details show the configured hard role model/options, or record any fallback warning.
+4. Before invoking the advisor, run `advisor_before="$(git -C "$smoke_dir" status --short)"`
    in the same terminal. Invoke `/sol-advisor-advisor` to review the file without
    changing it. Confirm the agent is shown as read-only, then run
    `test "$(git -C "$smoke_dir" status --short)" = "$advisor_before"` to prove the
    advisor created no additional change.
-4. Ask: `Use the Sol Advisor orchestration skill to append one line to
+5. Ask: `Use the Sol Advisor orchestration skill to append one line to
    cursor-smoke.txt through the routine role, verify the diff, and obtain the advisor
    verdict.` Confirm setup does not repeat, the parent remains the orchestrator, and
    the configured routine and advisor roles are used.
-5. In the same parent chat, ask Sol Advisor to call `get_setup_status` and
+6. In the same parent chat, ask Sol Advisor to call `get_setup_status` and
    `validate_configuration` for the exact smoke workspace. Both should report a ready,
    valid project profile.
 
@@ -440,7 +448,7 @@ After uninstall succeeds, preview reset_configuration for this disposable worksp
 isolated development data root and require its exact reset token before clearing it.
 ~~~
 
-Repeat each exact token, then verify the three managed agent files are gone. Remove the
+Repeat each exact token, then verify the four managed agent files are gone. Remove the
 unchanged compatibility bridge and guarded disposable workspace:
 
 ~~~sh
@@ -458,21 +466,22 @@ then deletes it without touching another project's preferences.
 
 A passing smoke test requires successful plugin discovery plus the documented project-MCP
 compatibility bridge, lazy parent-chat setup,
-non-mutating preview, exact-token installation, all three native subagents, observable
-routine/high/advisor routing, unchanged-file advisor review, validated configuration, and
+non-mutating preview, exact-token installation, all four native subagents, observable
+routine/high/hard/advisor routing, unchanged-file advisor review, validated configuration, and
 exact managed-file uninstall. Add this evidence to the draft PR before making it ready
 for review:
 
 ~~~text
 Cursor version:
-Plugin loaded + project MCP bridge connected (8 tools): pass/fail
+Plugin loaded + project MCP bridge connected (9 tools): pass/fail
 Setup stayed in parent chat: pass/fail
-Configured routine/high/advisor model values:
+Configured routine/high/hard/advisor model values:
 Preview paths/content inspected: pass/fail
 No files before exact token: pass/fail
-Three managed files after token: pass/fail
+Four managed files after token: pass/fail
 Observed routine routing/model/fallback:
 Observed high routing/model/fallback:
+Observed hard routing/model/fallback:
 Observed advisor routing/read-only/no-diff:
 Orchestration reused saved setup: pass/fail
 validate_configuration result:
@@ -487,7 +496,7 @@ bun install --frozen-lockfile
 bun run test
 bun run validate
 bun run ci
-bun run tag:check -- v0.5.0
+bun run tag:check -- v0.6.0
 bun run release:check
 git diff --check
 ~~~
