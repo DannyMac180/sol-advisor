@@ -2,7 +2,7 @@
 
 ## Schema-v2 general routes
 
-Use `$sol-advisor:routing` and `resolve_route` before a general native route.
+Use `$sol-advisor:routing` and challenge-first `resolve_route` before a general native route.
 Routine maps to routine, medium maps to the compatibility `high` storage role, hard
 maps to hard, and planning/review map to advisor. Review is always fresh and
 read-only only with observed evidence. Keep `fork_context=false` and parallelism at
@@ -21,21 +21,20 @@ Adapt every placeholder without removing a required field.
 
 ## Required preflight
 
-Before every native spawn, complete steps 1-2 of SKILL.md's preflight. After spawning,
-complete steps 3-4 before accepting the result:
+For schema-v2 generated roles, require the actual native spawn tool and the exact
+generated `agent_type` from the resolver. If either is absent, stop immediately; never
+search by shell, retry, or use `codex exec` as fallback. Spawn with `fork_context=false`
+and parallelism one. Obtain fresh, single-use challenge-bound inspector evidence before
+accepting parent or target placement. Capture observed sandbox and permission profile
+types for reviews.
 
-1. Require the non-mutating companion check to prove both installed files exactly
-   match current templates and the retired companion file is absent.
-2. Require native exposure of exactly `sol_advisor_terra_implementer` and
-   `sol_advisor_sol_reviewer`.
-3. Observe the selected role, model, and effort through public spawn/details metadata
-   first, using the local runtime inspector only for omitted fields. Accept only
-   Terra / High for implementation and Sol / High for review.
-4. For the reviewer, capture actual sandbox policy and permission profile types.
-
-A missing, stale, unsafe, conflicting, unavailable, inconsistent, or unobservable
-role/model/effort stops the native lane. Never silently fall back. Model and effort are
-pinned by custom-agent TOML, so omit native per-spawn overrides.
+The static Terra/Sol companion check applies only to the retained Codex compatibility
+lane. There, require the non-mutating companion check, exact exposure of
+`sol_advisor_terra_implementer` and `sol_advisor_sol_reviewer`, and public runtime
+metadata. General schema-v2 generated roles do not require those static companions.
+A missing, stale, unsafe, conflicting, unavailable, inconsistent, or unobservable role,
+model, effort, or isolation guarantee stops its applicable lane. Never silently fall
+back. Model and effort are pinned by custom-agent TOML, so omit per-spawn overrides.
 
 ## Shared implementation contract
 

@@ -112,52 +112,53 @@ pass "clean/idempotent install, migration, modified/stale/symlink refusals, CODE
 
 runtime_home=$tmp_dir/runtime-home
 runtime_id=11111111-1111-7111-8111-111111111111
+runtime_challenge=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
 runtime_file=$runtime_home/sessions/2026/08/13/rollout-2026-08-13T00-00-00-$runtime_id.jsonl
 mkdir -p "$(dirname "$runtime_file")"
 printf '%s\n' \
-  '{"type":"response_item","payload":{"prompt":"DO_NOT_LEAK_PROMPT"}}' \
-  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$runtime_id\"}}" \
-  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$runtime_id\"}}" \
-  '{"type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
-  '{"type":"event_msg","payload":{"type":"thread_settings_applied","thread_settings":{"service_tier":"priority"}}}' \
-  '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":123},"last_token_usage":{"input_tokens":20}}}}' \
-  '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":456},"last_token_usage":{"input_tokens":40}}}}' \
-  '{"type":"response_item","payload":{"type":"custom_tool_call"}}' \
-  '{"type":"event_msg","payload":{"type":"context_compacted"}}' \
+  '{"timestamp":"2026-08-13T00:00:00Z","type":"response_item","payload":{"prompt":"DO_NOT_LEAK_PROMPT"}}' \
+  "{\"timestamp\":\"2026-08-13T00:00:00Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"$runtime_id\"}}" \
+  "{\"timestamp\":\"2026-08-13T00:00:01Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"$runtime_id\"}}" \
+  '{"timestamp":"2026-08-13T00:00:02Z","type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
+  '{"timestamp":"2026-08-13T00:00:03Z","type":"event_msg","payload":{"type":"thread_settings_applied","thread_settings":{"service_tier":"priority"}}}' \
+  '{"timestamp":"2026-08-13T00:00:04Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":123},"last_token_usage":{"input_tokens":20}}}}' \
+  '{"timestamp":"2026-08-13T00:00:05Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":456},"last_token_usage":{"input_tokens":40}}}}' \
+  '{"timestamp":"2026-08-13T00:00:06Z","type":"response_item","payload":{"type":"custom_tool_call"}}' \
+  '{"timestamp":"2026-08-13T00:00:07Z","type":"event_msg","payload":{"type":"context_compacted"}}' \
   > "$runtime_file"
-runtime_output=$(CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" "$runtime_id")
-printf '%s\n' "$runtime_output" | jq -e --arg id "$runtime_id" '.thread_id==$id and .evidence_source=="codex-rollout-inspector" and .execution_context=="parent" and .agent_identifier==null and .observed_runtime_tier=="priority" and .raw_tokens==456 and .model_rounds==2 and .median_input_tokens_per_round==30 and .median_input_tokens_first_20==null and .tool_calls==1 and .compactions==1' >/dev/null || fail "runtime inspector parent evidence is incorrect"
+runtime_output=$(CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --challenge "$runtime_challenge" "$runtime_id")
+printf '%s\n' "$runtime_output" | jq -e --arg id "$runtime_id" --arg challenge "$runtime_challenge" '.challenge==$challenge and .threadId==$id and .latestEventAt=="2026-08-13T00:00:07Z" and .evidenceSource=="codex-rollout-inspector" and .executionContext=="parent" and .agentIdentifier==null and .observedRuntimeTier=="priority" and .rawTokens==456 and .modelRounds==2 and .medianInputTokensPerRound==30 and .medianInputTokensFirst20==null and .toolCalls==1 and .compactions==1' >/dev/null || fail "runtime inspector parent evidence is incorrect"
 agent_id=22222222-2222-7222-8222-222222222222
 agent_file=$runtime_home/sessions/2026/08/13/rollout-2026-08-13T00-00-00-$agent_id.jsonl
 printf '%s\n' \
-  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$agent_id\",\"parent_thread_id\":\"$runtime_id\",\"agent_role\":\"sol_advisor_routine\"}}" \
-  '{"type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
+  "{\"timestamp\":\"2026-08-13T00:00:08Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"$agent_id\",\"parent_thread_id\":\"$runtime_id\",\"agent_role\":\"sol_advisor_routine\"}}" \
+  '{"timestamp":"2026-08-13T00:00:09Z","type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
   > "$agent_file"
-agent_output=$(CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" "$agent_id")
-printf '%s\n' "$agent_output" | jq -e --arg id "$agent_id" '.thread_id==$id and .evidence_source=="codex-rollout-inspector" and .execution_context=="agent" and .agent_identifier=="sol_advisor_routine"' >/dev/null || fail "runtime inspector agent evidence is incorrect"
+agent_output=$(CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --challenge "$runtime_challenge" "$agent_id")
+printf '%s\n' "$agent_output" | jq -e --arg id "$agent_id" '.threadId==$id and .executionContext=="agent" and .agentIdentifier=="sol_advisor_routine"' >/dev/null || fail "runtime inspector agent evidence is incorrect"
 mixed_parent_id=33333333-3333-7333-8333-333333333333
 mixed_parent_file=$runtime_home/sessions/2026/08/13/rollout-2026-08-13T00-00-00-$mixed_parent_id.jsonl
 printf '%s\n' \
-  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_parent_id\"}}" \
-  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_parent_id\",\"parent_thread_id\":\"$runtime_id\",\"agent_role\":\"sol_advisor_routine\"}}" \
-  '{"type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
+  "{\"timestamp\":\"2026-08-13T00:00:10Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_parent_id\"}}" \
+  "{\"timestamp\":\"2026-08-13T00:00:11Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_parent_id\",\"parent_thread_id\":\"$runtime_id\",\"agent_role\":\"sol_advisor_routine\"}}" \
+  '{"timestamp":"2026-08-13T00:00:12Z","type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
   > "$mixed_parent_file"
-if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" "$mixed_parent_id" >/dev/null 2>&1; then fail "runtime inspector accepted mixed parent-thread provenance"; fi
+if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --challenge "$runtime_challenge" "$mixed_parent_id" >/dev/null 2>&1; then fail "runtime inspector accepted mixed parent-thread provenance"; fi
 mixed_role_id=44444444-4444-7444-8444-444444444444
 mixed_role_file=$runtime_home/sessions/2026/08/13/rollout-2026-08-13T00-00-00-$mixed_role_id.jsonl
 printf '%s\n' \
-  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_role_id\",\"parent_thread_id\":\"$runtime_id\",\"agent_role\":\"sol_advisor_routine\"}}" \
-  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_role_id\",\"parent_thread_id\":\"$runtime_id\"}}" \
-  '{"type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
+  "{\"timestamp\":\"2026-08-13T00:00:13Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_role_id\",\"parent_thread_id\":\"$runtime_id\",\"agent_role\":\"sol_advisor_routine\"}}" \
+  "{\"timestamp\":\"2026-08-13T00:00:14Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_role_id\",\"parent_thread_id\":\"$runtime_id\"}}" \
+  '{"timestamp":"2026-08-13T00:00:15Z","type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
   > "$mixed_role_file"
-if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" "$mixed_role_id" >/dev/null 2>&1; then fail "runtime inspector accepted mixed agent-role provenance"; fi
+if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --challenge "$runtime_challenge" "$mixed_role_id" >/dev/null 2>&1; then fail "runtime inspector accepted mixed agent-role provenance"; fi
 parent_role_id=55555555-5555-7555-8555-555555555555
 parent_role_file=$runtime_home/sessions/2026/08/13/rollout-2026-08-13T00-00-00-$parent_role_id.jsonl
 printf '%s\n' \
-  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$parent_role_id\",\"agent_role\":\"sol_advisor_routine\"}}" \
-  '{"type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
+  "{\"timestamp\":\"2026-08-13T00:00:16Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"$parent_role_id\",\"agent_role\":\"sol_advisor_routine\"}}" \
+  '{"timestamp":"2026-08-13T00:00:17Z","type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
   > "$parent_role_file"
-if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" "$parent_role_id" >/dev/null 2>&1; then fail "runtime inspector accepted parent metadata with an agent role"; fi
+if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --challenge "$runtime_challenge" "$parent_role_id" >/dev/null 2>&1; then fail "runtime inspector accepted parent metadata with an agent role"; fi
 if printf '%s\n' "$runtime_output" | grep -Fq DO_NOT_LEAK; then fail "runtime inspector leaked prompt canary"; fi
 if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --sessions-dir "$runtime_home" "$runtime_id" >/dev/null 2>&1; then fail "runtime inspector accepted an arbitrary path"; fi
 pass "pathless aggregate runtime inspection, provenance rejection, and prompt-canary privacy"
@@ -171,7 +172,7 @@ grep -Fq 'Its nine tools are:' "$readme" || fail "README tool count is stale"
 grep -Fq -- '- `resolve_route`' "$readme" || fail "README tool list omits route resolver"
 grep -Fq 'routine to `routine`; medium to the `high` compatibility storage role; hard' "$readme" || fail "README class mapping is stale"
 grep -Fq 'and planning or review to `advisor`.' "$readme" || fail "README advisor class mapping is stale"
-printf '%s\n' "$readme_text" | grep -Fq 'Any route change requires a fresh exact agent.' || fail "README fresh-route rule is stale"
+printf '%s\n' "$readme_text" | grep -Fq '`spawn-required` preserves the active challenge. Accepted parent or target proof consumes it. Blocked provenance, same-thread evidence, or a target mismatch invalidates it and requires a new route challenge.' || fail "README challenge lifecycle rule is stale"
 grep -Fq 'Reviews are always fresh and read-only' "$readme" || fail "README review rule is stale"
 if grep -Eq 'all eight tools|these eight enabled tools' "$readme"; then fail "README stale eight-tool wording remains"; fi
 grep -Fq 'four generated files' "$readme" || fail "README generated-file count is stale"

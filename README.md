@@ -241,10 +241,14 @@ rerun verification, correction loops, and acceptance. Worker reports are claims 
 the parent verifies the working tree and checks. The five task classes route as
 follows: routine to `routine`; medium to the `high` compatibility storage role; hard
 to `hard`; and planning or review to `advisor`. The parent runs a route only when its
-current evidence is exact and the task is not review. Any route change requires a
-fresh exact agent. Reviews are always fresh and read-only, with runtime evidence
-required before use. Sol Advisor reports the observed guarantee rather than inventing
-one.
+current evidence is fresh, exact, and challenge-bound, and the task is not review.
+Call `resolve_route` first without evidence to obtain its expiring single-use challenge,
+then pass the inspector's complete camelCase object unchanged. Any route change requires
+a fresh exact agent. `spawn-required` preserves the active challenge. Accepted parent
+or target proof consumes it. Blocked provenance, same-thread evidence, or a target
+mismatch invalidates it and requires a new route challenge.
+Reviews are always fresh and read-only, with runtime evidence required before use. Sol
+Advisor reports the observed guarantee rather than inventing one.
 
 The historical exact Codex native compatibility lane remains separate: it uses a
 separately installed Terra / High implementer and a fresh Sol / High reviewer. It
@@ -296,7 +300,7 @@ Start a fresh task afterward. The installer refuses conflicting or symlinked fil
 retains the byte-exact v0.2.0 migration. Runtime routing may be inspected with:
 
 ~~~sh
-sh "$plugin_dir/scripts/inspect-agent-runtime.sh" <native-subagent-thread-id>
+sh "$plugin_dir/scripts/inspect-agent-runtime.sh" --challenge <resolve-route-challenge> <native-thread-id>
 ~~~
 
 ## Security model and limitations

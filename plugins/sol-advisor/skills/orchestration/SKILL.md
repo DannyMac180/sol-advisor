@@ -18,7 +18,7 @@ and never claim it was changed. Sol / High is a recommendation only. Exact nativ
 role model IDs and supported reasoning settings come from saved preferences. There is
 no silent fallback, translation, guessed role, or universal model enumeration.
 
-Use `$sol-advisor:routing` and `resolve_route` for every general route. The five
+Use `$sol-advisor:routing` and challenge-first `resolve_route` for every general route. The five
 classes are routine, medium, hard, planning, and review. Medium maps to the retained
 `roles.high` storage role; planning and review use advisor, and review is always a
 fresh read-only agent only when observed evidence proves that state. A blocked route,
@@ -65,7 +65,7 @@ the parent selection.
 ## Choose a lane
 
 Use the configured four-role adapter only after its exact preview/install lifecycle
-and fresh runtime evidence pass. Codex uses `sol_advisor_routine`,
+and fresh challenge-bound runtime evidence pass. Codex uses `sol_advisor_routine`,
 `sol_advisor_high`, `sol_advisor_hard`, and `sol_advisor_advisor`; other clients
 use the matching hyphenated identifiers. The static Terra implementer and Sol reviewer
 remain compatibility aliases, not a substitute for a blocked general route.
@@ -73,6 +73,11 @@ remain compatibility aliases, not a substitute for a blocked general route.
 The retained exact Codex compatibility lane may still use its separately installed
 `sol_advisor_terra_implementer` and `sol_advisor_sol_reviewer` profiles and the legacy
 preflight below. Do not require those companions for configured cross-client roles.
+
+For a schema-v2 generated role, inspect the actual native spawn tool before spawning.
+It must expose the exact generated `agent_type` returned by `resolve_route`. If that
+tool or type is absent, stop immediately. Never search with a shell, retry discovery,
+or invoke `codex exec` as a fallback. Use `fork_context=false` and parallelism one.
 
 Activate the Luna task lane only when the user's current request explicitly says
 “Use the Luna task lane.” It uses Codex app task tools rather than a native agent file.
@@ -84,7 +89,7 @@ The two role files are user-owned native custom-agent TOML files. Installing or
 updating the plugin does not automatically register them. Install them separately and
 start a fresh Codex task so native discovery sees the current profiles.
 
-Before every native delegation, complete steps 1-2. After spawning a native lane,
+Before every retained compatibility-lane delegation, complete steps 1-2. After spawning a compatibility lane,
 complete steps 3-4 before accepting its result. The Luna lane has a separate app-tool
 preflight in its contract:
 
@@ -117,19 +122,8 @@ preflight in its contract:
    public native spawn/details metadata first. It must identify the selected custom
    role. When it exposes model or effort, compare them with the role pin.
 
-   If public details omit model or effort and the local rollout is accessible, resolve
-   `../../scripts/inspect-agent-runtime.sh` relative to this SKILL.md and run:
-
-   ~~~sh
-   skill_dir=<directory-containing-this-SKILL.md>
-   runtime_inspector="$skill_dir/../../scripts/inspect-agent-runtime.sh"
-   sh "$runtime_inspector" <native-subagent-thread-id>
-   ~~~
-
-   The helper's allowlisted output is the authoritative local fallback for omitted
-   model and effort. If public and local values both exist, they must agree. Accepted
-   values are Terra / high for implementation and Sol / high for review. Missing,
-   inconsistent, unavailable, or unobservable routing stops that lane.
+   The challenge-bound local inspector is for schema-v2 general routes only. If public
+   compatibility-lane details omit model or effort, stop that compatibility lane.
 
 4. For every Sol review, capture the observed sandbox policy type and permission
    profile type. The shipped reviewer requests read-only sandboxing, but the host may

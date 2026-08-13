@@ -9,18 +9,24 @@ Call `get_setup_status` and `get_preferences` first. Schema-v1 state migrates
 atomically to schema v2. Never change live preferences, install adapters, or use a
 role until the user has explicitly asked for that action.
 
-Call `resolve_route` with one task class and `currentRuntimeEvidence`. Inspector
-evidence must state `evidenceSource="codex-rollout-inspector"`,
-`executionContext="parent"`, and `agentIdentifier=null`. It compares the current
-model, effort, observed runtime tier, and sandbox with the saved role. Treat a blocked
-result as a stop. Do not infer missing evidence or select a fallback.
+Call `resolve_route` with a task class first, without runtime evidence. It returns a
+cryptographically random, task/profile/tier-bound, short-lived single-use `challenge`.
+This result does not select or finalize a route. Then invoke the pathless inspector
+exactly as `sh inspect-agent-runtime.sh --challenge <challenge> <thread-id>` and pass
+its complete camelCase JSON object directly as `currentRuntimeEvidence` or
+`targetRuntimeEvidence`, together with the same top-level `challenge`. Do not rename,
+trim, or reconstruct fields. Treat a blocked result as a stop.
 
 If the current route is exact and the task is not review, use the parent result. If it
 differs, or the task is review, the result is `fresh_agent` and `spawn-required` until
 separate `targetRuntimeEvidence` proves the generated identifier, model, effort, tier
-when exposed, and sandbox. Target evidence must instead state
-`executionContext="agent"` and the canonical nonempty generated identifier. A target
-mismatch blocks.
+when exposed, and sandbox. The active challenge remains in that output. The target
+must use a different thread ID, a latest event at or after challenge issuance, no more
+than the bounded future-clock skew, and the same unconsumed challenge. Replayed,
+expired, old, unknown, or secret-bearing evidence blocks. `spawn-required` preserves
+the active challenge. Accepted parent or target proof consumes it. Blocked provenance,
+same-thread evidence, or a target mismatch invalidates it and requires a new route
+challenge.
 Reviews are always fresh. `escalated` is true exactly for a fresh agent.
 
 - Routine maps to `roles.routine`.
@@ -38,7 +44,10 @@ presents as **Fast**, requests runtime tier `priority`, and is allowed only for 
 `routine` route whose configured role is exactly Luna / max. It has no fallback.
 Fast blocks unless priority is observed. If that task expands, restart it as Luna/default.
 
-Keep `fork_context=false` and parallelism at one. Enforce route budgets:
+Before a generated-role spawn, inspect the actual native spawn tool. It must expose the
+exact generated `agent_type` returned by the resolver. If the tool or type is absent,
+stop immediately. Never search for it through a shell, retry, or use `codex exec` as a
+fallback. Spawn with `fork_context=false` and parallelism one. Enforce route budgets:
 
 - Routine, medium, hard: 50 tools, 5M raw tokens, first compaction.
 - Planning, review: 25 tools, 2.5M raw tokens, no compaction.
