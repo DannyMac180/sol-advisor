@@ -29,7 +29,7 @@
     ],
     "websiteURL": "https://github.com/DannyMac180/sol-advisor",
     "defaultPrompt": [
-      "Use Sol Advisor's native lane to build this feature, verify it, and obtain the fresh Sol review before completion.",
+      "Use challenge-first resolve_route; use its exact generated role and fresh exact generated advisor review.",
       "Use the Luna task lane only if I explicitly authorize it; create visible GPT-5.6 Luna / Max tasks via Codex app tools."
     ]
   }

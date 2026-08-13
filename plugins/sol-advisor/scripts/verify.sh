@@ -69,9 +69,12 @@ cp "$templates/$sol_file" "$target/$sol_file"; test "$(shasum -a 256 "$target/$t
 test "$(jq -r .version "$manifest")" = "0.6.0" || fail "manifest version is not 0.6.0"
 if ! jq -e '
   (.interface.defaultPrompt | type == "array") and
-  all(.interface.defaultPrompt[]; type == "string" and length <= 128)
+  all(.interface.defaultPrompt[]; type == "string" and length <= 128) and
+  any(.interface.defaultPrompt[]; . == "Use challenge-first resolve_route; use its exact generated role and fresh exact generated advisor review.") and
+  any(.interface.defaultPrompt[]; . == "Use the Luna task lane only if I explicitly authorize it; create visible GPT-5.6 Luna / Max tasks via Codex app tools.") and
+  all(.interface.defaultPrompt[]; contains("fresh Sol review") | not)
 ' "$manifest" >/dev/null; then
-  fail ".codex-plugin interface.defaultPrompt entries must be strings of at most 128 characters"
+  fail ".codex-plugin default prompts must be guarded schema-v2/generated-advisor and explicit-Luna text"
 fi
 test "$(jq -r .version "$plugin_dir/plugin.json")" = "0.6.0" || fail "canonical manifest version is not 0.6.0"
 test "$(node -p "require('$repo_dir/package.json').version")" = "0.6.0" || fail "package version is not 0.6.0"
@@ -195,6 +198,8 @@ grep -Fq 'Every schema-v2 generated-role prompt' "$contracts" || fail "role cont
 grep -Fq 'Only after explicit current-request compatibility opt-in' "$contracts" || fail "role contracts omit static compatibility gate"
 grep -Fq 'exact schema-v2 role' "$agent_config" || fail "orchestration agent prompt omits schema-v2 routing"
 grep -Fq 'inherits the user' "$luna_contract" || fail "Luna contract omits inherited parent setting"
+grep -Fq "available only when the user's current" "$plugin_dir/skills/orchestration/references/portable-entry.md" || fail "portable entry omits explicit compatibility opt-in"
+grep -Fq 'routing preflight' "$plugin_dir/skills/orchestration/references/portable-entry.md" || fail "portable entry omits compatibility preflight"
 orchestration_text=$(tr '\n' ' ' < "$skill")
 contracts_text=$(tr '\n' ' ' < "$contracts")
 if printf '%s\n' "$orchestration_text" | grep -Fq 'The default native lane delegates implementation to Terra / High'; then fail "orchestration default still routes through static Terra"; fi
@@ -202,6 +207,8 @@ if printf '%s\n' "$orchestration_text" | grep -Fq 'For the native lane, delegate
 if printf '%s\n' "$orchestration_text" | grep -Fq 'After native implementation and parent verification, always spawn a new, fresh reviewer'; then fail "orchestration final review still requires static Sol"; fi
 if printf '%s\n' "$contracts_text" | grep -Fq 'Terra / High - sole native implementation lane'; then fail "role contracts still describe Terra as the sole native lane"; fi
 if printf '%s\n' "$contracts_text" | grep -Fq 'Use this lane for every delegated native implementation'; then fail "role contracts still make static Terra the general default"; fi
+portable_text=$(tr '\n' ' ' < "$plugin_dir/skills/orchestration/references/portable-entry.md")
+if printf '%s\n' "$portable_text" | grep -Fq 'compatibility lane remains available when its separately installed roles'; then fail "portable entry still exposes ungated compatibility"; fi
 readme_text=$(tr '\n' ' ' < "$readme")
 grep -Fq 'sol-advisor-hard' "$readme" || fail "README omits hard role"
 grep -Fq 'Its nine tools are:' "$readme" || fail "README tool count is stale"
