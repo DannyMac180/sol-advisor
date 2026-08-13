@@ -1,6 +1,6 @@
 ---
 name: setup
-description: "Run Sol Advisor's first-use or reconfiguration interview in the parent chat, validate exact client-native model choices, persist logical preferences, preview native adapter files, and install only after explicit confirmation."
+description: "Run Sol Advisor's schema-v2 setup interview, validate four exact client-native role choices, preview native adapters, and install only after explicit confirmation."
 ---
 
 # Sol Advisor setup
@@ -17,8 +17,8 @@ Ask one focused question at a time:
 3. Ask for the explicit existing workspace directory used to key this profile and to
    compute allowlisted adapter destinations.
 4. Ask the user to open the client's model picker or `/model` and copy the **exact
-   native model ID** for routine implementation, high-complexity implementation, and
-   advisor. Never enumerate, normalize, guess, or silently substitute model IDs.
+   native model ID** for routine, medium-compatible high, hard, and advisor roles.
+   Never enumerate, normalize, guess, or silently substitute model IDs.
 5. Where supported, ask for the exact native reasoning setting. Codex and Cursor may
    store per-role effort. VS Code/GitHub Copilot adapters store model only; explain
    the parent cost-tier constraint. Kiro effort is session/per-model, not per-agent.
@@ -30,12 +30,16 @@ Ask one focused question at a time:
 
 Offer these current Codex recommendations as editable defaults, not universal IDs:
 
-- routine: `gpt-5.6-terra`, effort `high`
+- routine: `gpt-5.6-luna`, effort `max`
 - high: `gpt-5.6-terra`, effort `high`
+- hard: `gpt-5.6-sol`, effort `high`
 - advisor: `gpt-5.6-sol`, effort `high`, requested read-only
-- orchestrator: always `inherit`; recommend selecting Sol / High in the main chat
+- orchestrator: always `inherit`; recommend Luna / Max / Standard in the main chat
 
 Call `save_preferences` only after showing the complete logical preference object.
+All four saved roles use machine tier `default`. A migrated v1 hard role stays
+pending until its four-role preview gets a separate consent and fresh runtime
+discovery agrees with the saved model, effort, and tier.
 Use no secrets. For an unsupported execution surface (ChatGPT Work web, Kiro web/mobile, or a
 skills-only client), do not claim or store a native profile: those surfaces are not in
 the client enum. Use parent-chat prompt guidance only and say role bindings are not
@@ -50,5 +54,6 @@ scope additionally requires the exact separate user-scope token. Never treat “
 as either token.
 
 After install, tell the user to start a new chat or reload the client. Reconfiguration
-repeats the interview and exact preview. Uninstall first previews its managed files
+repeats the interview and exact preview, but preserves pending hard-route consent or
+runtime proof state. Uninstall first previews its managed files
 and exact token, then removes only the unchanged managed files after confirmation.

@@ -5,6 +5,32 @@ All notable changes to Sol Advisor are documented here. This project follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Reconfiguration now preserves restrictive hard-route consent/runtime state, and
+  route evidence binds agents to the exact parent thread with complete authoritative
+  turn contexts.
+- Route challenges now precede Fast, hard-consent, and missing-effort policy output.
+- Parent guidance is Luna / Max / Standard; static Terra / Sol remains opt-in
+  compatibility only.
+- Schema-v2 challenge-first generated routing is the default orchestration path;
+  static Terra/Sol preflight, correction, and review are compatibility-only.
+- Current-parent authoritative contexts may predate challenge issuance within a strict
+  five-minute resolution-age bound; target-agent proof remains post-challenge.
+
+## [0.6.0] - 2026-08-13
+
+### Added
+
+- Strict schema-v2 preferences with routine, medium-compatible high, hard, and advisor roles.
+- $sol-advisor:routing, fail-closed route resolution, bounded Fast, budgets, and configured-versus-observed runtime evidence.
+- Automatic atomic v1 migration, four-role adapter lifecycle, and pathless aggregate runtime inspection.
+
+### Changed
+
+- Migrated hard routes require separate four-role consent and fresh runtime proof before routing.
+- Terra implementer and Sol reviewer remain exact compatibility aliases.
+
 ### Added
 
 - Cursor local-clone installation guide plus developer smoke-test procedure with guarded setup, evidence, and cleanup steps.
@@ -35,5 +61,6 @@ All notable changes to Sol Advisor are documented here. This project follows
 - Retained native Codex delivery on Terra / High with a fresh Sol / High review.
 - Retired the Luna native companion role while preserving exact legacy migration.
 
-[Unreleased]: https://github.com/DannyMac180/sol-advisor/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/DannyMac180/sol-advisor/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/DannyMac180/sol-advisor/releases/tag/v0.6.0
 [0.5.0]: https://github.com/DannyMac180/sol-advisor/releases/tag/v0.5.0

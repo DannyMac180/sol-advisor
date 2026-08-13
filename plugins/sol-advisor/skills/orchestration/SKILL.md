@@ -1,6 +1,6 @@
 ---
 name: orchestration
-description: "Configurable cross-client architect workflow that inherits the parent model, loads saved exact native role preferences, routes routine versus high-complexity implementation, preserves the separate opt-in Luna app-task lane, and keeps parent verification and acceptance."
+description: "Architect workflow that uses schema-v2 route resolution, preserves the separate opt-in Luna app-task lane, and keeps parent verification and acceptance."
 ---
 
 # Sol Advisor Orchestration
@@ -13,17 +13,18 @@ interview in this parent/main chat and stop orchestration until preferences vali
 Load `get_preferences` on every invocation; do not rely on remembered defaults.
 
 The orchestrator always inherits the model and reasoning setting the user selected in
-the parent chat. Never block because the parent is not Sol / High, never change it,
-and never claim it was changed. Sol / High is a recommendation only. Exact native
+the parent chat. Never block because the parent is not Luna / Max / Standard, never
+change it, and never claim it was changed. Luna / Max / Standard is a recommendation
+only. Exact native
 role model IDs and supported reasoning settings come from saved preferences. There is
 no silent fallback, translation, guessed role, or universal model enumeration.
 
-Select the routine implementer for bounded mechanical changes, boilerplate, wiring,
-and fully specified work. Select the high-complexity implementer for security-sensitive
-logic, concurrency, non-trivial algorithms, difficult debugging, migrations, or
-wide-blast-radius refactors. Invoke the exact installed native role names produced by
-the confirmed client adapter. The advisor remains behaviorally read-only and its
-actual sandbox guarantee must be reported from client evidence, not inferred.
+Use `$sol-advisor:routing` and challenge-first `resolve_route` for every general route. The five
+classes are routine, medium, hard, planning, and review. Medium maps to the retained
+`roles.high` storage role; planning and review use advisor, and review is always a
+fresh read-only agent only when observed evidence proves that state. A blocked route,
+missing runtime evidence, unavailable model, unsupported effort, or disagreement
+between requested, saved, and observed tier stops the lane without fallback.
 
 On ChatGPT Work web, Kiro web/mobile, and skills-only surfaces without enforceable
 native role bindings, use the stored preferences as prompt guidance only and state
@@ -32,11 +33,12 @@ Luna / Max app-task lane remains separate and opt-in; never use it as fallback.
 
 Act as the architect. Own the user's intent, architecture, decomposition, complete
 task specification, parent verification, and final acceptance. The default native
-lane delegates implementation to Terra / High and requires a fresh Sol verdict. The
-explicit Luna task lane creates user-visible Codex app tasks at GPT-5.6 Luna / Max;
-the primary task monitors, reviews, corrects, authorizes PR creation, and orders
-dependent stacks. These lanes are distinct: the Luna lane is outside native subagent
-V2, never uses a Luna custom-agent TOML, and is never activated implicitly.
+path is the schema-v2 route returned by challenge-first `resolve_route`, including its
+exact generated implementer or advisor role and fresh bound runtime proof. The explicit
+Luna task lane creates user-visible Codex app tasks at GPT-5.6 Luna / Max; the primary
+task monitors, reviews, corrects, authorizes PR creation, and orders dependent stacks.
+These lanes are distinct: the Luna lane is outside native subagent V2, never uses a
+Luna custom-agent TOML, and is never activated implicitly.
 
 Read [references/role-contracts.md](references/role-contracts.md) before the first
 native delegation in a session. Read the [Luna task-lane contract](references/luna-task-lane.md)
@@ -59,22 +61,27 @@ capability matrix. Manifest conformance is not evidence of runtime behavior.
 
 The primary session inherits the user's current model and reasoning setting. When
 metadata exposes them, report them without treating any particular value as a gate.
-Recommend Sol / High for current Codex use, but do not stop or claim a skill can alter
-the parent selection.
+Recommend Luna / Max / Standard for current Codex use, but do not stop or claim a
+skill can alter the parent selection.
 
 ## Choose a lane
 
-Use the configured native adapter by default when its exact three roles are
-observable. Invoke the exact generated frontmatter/native name: Codex uses
-`sol_advisor_routine`, `sol_advisor_high`, and `sol_advisor_advisor`; Cursor, VS Code,
-GitHub Copilot, and Kiro use `sol-advisor-routine`, `sol-advisor-high`, and
-`sol-advisor-advisor`. Never prescribe Codex identifiers cross-client. Role files,
-not per-spawn guesses, carry client-native model settings. Report routing or sandbox
-evidence only when exposed by the host.
+Use the configured four-role adapter only after its exact preview/install lifecycle
+and fresh challenge-bound runtime evidence pass. Codex uses `sol_advisor_routine`,
+`sol_advisor_high`, `sol_advisor_hard`, and `sol_advisor_advisor`; other clients
+use the matching hyphenated identifiers. The static Terra implementer and Sol reviewer
+remain compatibility aliases, not a substitute for a blocked general route.
 
-The retained exact Codex compatibility lane may still use its separately installed
-`sol_advisor_terra_implementer` and `sol_advisor_sol_reviewer` profiles and the legacy
-preflight below. Do not require those companions for configured cross-client roles.
+Use the retained exact Codex compatibility lane only when the user's current request
+explicitly says to use that compatibility lane. It may then use the separately
+installed `sol_advisor_terra_implementer` and `sol_advisor_sol_reviewer` profiles and
+the legacy preflight below. Do not require or fall back to those companions for a
+schema-v2 general route.
+
+For a schema-v2 generated role, inspect the actual native spawn tool before spawning.
+It must expose the exact generated `agent_type` returned by `resolve_route`. If that
+tool or type is absent, stop immediately. Never search with a shell, retry discovery,
+or invoke `codex exec` as a fallback. Use `fork_context=false` and parallelism one.
 
 Activate the Luna task lane only when the user's current request explicitly says
 “Use the Luna task lane.” It uses Codex app task tools rather than a native agent file.
@@ -82,11 +89,12 @@ If Luna / Max or a required app tool is unavailable, stop without fallback.
 
 ## Retained Codex compatibility preflight
 
-The two role files are user-owned native custom-agent TOML files. Installing or
-updating the plugin does not automatically register them. Install them separately and
-start a fresh Codex task so native discovery sees the current profiles.
+Use this preflight only after explicit current-request opt-in to the retained Codex
+compatibility lane. The two role files are user-owned native custom-agent TOML files.
+Installing or updating the plugin does not automatically register them. Install them
+separately and start a fresh Codex task so native discovery sees the current profiles.
 
-Before every native delegation, complete steps 1-2. After spawning a native lane,
+Before every retained compatibility-lane delegation, complete steps 1-2. After spawning a compatibility lane,
 complete steps 3-4 before accepting its result. The Luna lane has a separate app-tool
 preflight in its contract:
 
@@ -119,19 +127,8 @@ preflight in its contract:
    public native spawn/details metadata first. It must identify the selected custom
    role. When it exposes model or effort, compare them with the role pin.
 
-   If public details omit model or effort and the local rollout is accessible, resolve
-   `../../scripts/inspect-agent-runtime.sh` relative to this SKILL.md and run:
-
-   ~~~sh
-   skill_dir=<directory-containing-this-SKILL.md>
-   runtime_inspector="$skill_dir/../../scripts/inspect-agent-runtime.sh"
-   sh "$runtime_inspector" <native-subagent-thread-id>
-   ~~~
-
-   The helper's allowlisted output is the authoritative local fallback for omitted
-   model and effort. If public and local values both exist, they must agree. Accepted
-   values are Terra / high for implementation and Sol / high for review. Missing,
-   inconsistent, unavailable, or unobservable routing stops that lane.
+   The challenge-bound local inspector is for schema-v2 general routes only. If public
+   compatibility-lane details omit model or effort, stop that compatibility lane.
 
 4. For every Sol review, capture the observed sandbox policy type and permission
    profile type. The shipped reviewer requests read-only sandboxing, but the host may
@@ -157,12 +154,12 @@ is wrong, correct the specification and delegate the fix. If the Luna result is 
 send a precise correction back to the same task. Do not silently repair a failed child
 patch or create a replacement task merely to avoid an unresolved correction.
 
-## Retained Codex native implementation through Terra / High
+## Explicit retained Codex compatibility implementation through Terra / High
 
-This section applies only to the explicitly retained exact Codex compatibility lane, not configured adapters. Use the same role for routine features, mechanical edits, difficult debugging,
-security-sensitive work, non-trivial algorithms, and broad refactors. There is no
-second native implementation or fallback lane. This section applies only when the
-user has not explicitly chosen the Luna task lane.
+Use this section only when the user's current request explicitly opts into the retained
+Codex compatibility lane. It does not apply to schema-v2 generated roles, and it is
+never a fallback for a blocked general route or an alternative to a required
+challenge-first `resolve_route` call.
 
 Spawn exactly:
 
@@ -231,14 +228,16 @@ Treat worker reports as claims. Before acceptance:
 2. Confirm only in-scope files changed.
 3. Rerun the specification's verification commands in the primary session.
 4. Compare the evidence with the objective, interfaces, and constraints.
-5. For the native lane, delegate corrections through Terra; for the Luna lane, send
-   corrections back to the same task and re-review its updated evidence.
+5. For a schema-v2 general route, obtain a new challenge-first `resolve_route` result
+   and use its exact generated role for corrections or review. For an explicitly
+   selected compatibility lane, use its compatibility contract. For the Luna lane,
+   send corrections back to the same task and re-review its updated evidence.
 
-## Consult fresh Sol at native commitment boundaries
+## Compatibility-lane fresh Sol consults
 
-Before a consequential architecture, migration, public API, or wide refactor in the
-native lane, spawn a fresh reviewer using the commitment-boundary packet from the role
-contracts:
+Only after explicit current-request opt-in to the compatibility lane, a consequential
+architecture, migration, public API, or wide refactor may spawn a fresh static reviewer
+using the commitment-boundary packet from the role contracts:
 
 ~~~text
 agent_type: sol_advisor_sol_reviewer
@@ -250,10 +249,10 @@ reasoning fields. Observe actual routing, sandbox, and permission metadata. The
 primary session remains responsible for the decision. Do not route the Luna task lane
 through this native reviewer.
 
-## Require the final Sol review for the native lane
+## Compatibility-lane final Sol review
 
-After native implementation and parent verification, always spawn a new, fresh
-reviewer:
+Only after explicit current-request opt-in to the compatibility lane, after native
+implementation and parent verification, spawn a new fresh static reviewer:
 
 ~~~text
 agent_type: sol_advisor_sol_reviewer
@@ -280,7 +279,8 @@ Apply the observed sandbox policy:
 - If hard isolation is required, the sandbox is unobservable, or any mutation occurs,
   stop the review. Do not claim read-only isolation or hide the mutation.
 
-For the Luna task lane, the primary Sol task itself performs the final review and
+For schema-v2 general routes, use the fresh advisor route returned by `resolve_route`;
+never substitute this static reviewer. For the Luna task lane, the primary task itself performs the final review and
 acceptance after `wait_threads`/`read_thread`, actual diff inspection, and rerun
 verification. Do not spawn the native Sol reviewer for that lane. Any correction
 invalidates the prior child handoff; review the same child task again before accepting

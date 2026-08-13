@@ -1,7 +1,7 @@
 {
   "name": "sol-advisor",
-  "version": "0.5.0",
-  "description": "Configurable architect workflow that inherits the parent model, supports exact native roles, preserves explicit opt-in GPT-5.6 Luna app tasks through Codex app task tools, and retains fresh Sol review compatibility.",
+  "version": "0.6.0",
+  "description": "Configurable architect workflow with schema-v2 four-role routing, observed runtime evidence, explicit opt-in GPT-5.6 Luna app tasks, and Terra/Sol compatibility aliases.",
   "author": {
     "name": "Daniel McAteer",
     "url": "https://github.com/DannyMac180"
@@ -12,14 +12,15 @@
   "keywords": [
     "codex",
     "orchestration",
+    "routing",
     "multi-agent",
     "gpt-5.6"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Sol Advisor",
-    "shortDescription": "Inherit the parent model, configure exact native roles, or explicitly opt into Luna tasks.",
-    "longDescription": "Sol Advisor runs lazy parent-chat setup, stores non-secret exact role preferences, safely previews and installs Codex-native adapters, and preserves the explicit opt-in GPT-5.6 Luna / Max app-task lane through Codex app task tools. The parent owns architecture, diff verification, correction loops, and acceptance; the retained native compatibility lane uses Terra / High plus a fresh Sol review. The opt-in lane uses list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread.",
+    "shortDescription": "Route work with saved roles plus observed runtime proof, or explicitly opt into Luna tasks.",
+    "longDescription": "Sol Advisor v0.6 stores non-secret schema-v2 roles, previews four native role files, and resolves routine, medium, hard, planning, and review routes only when configured and observed runtime evidence agree. Fast is an explicit bounded Luna/Max routine override. Terra implementer and Sol reviewer remain compatibility aliases. The explicit Luna task lane uses list_projects, list_threads, create_thread, wait_threads, read_thread, and send_message_to_thread.",
     "developerName": "Daniel McAteer",
     "category": "Productivity",
     "capabilities": [
@@ -28,8 +29,8 @@
     ],
     "websiteURL": "https://github.com/DannyMac180/sol-advisor",
     "defaultPrompt": [
-      "Use Sol Advisor's native lane to build this feature, verify it, and obtain the fresh Sol review before completion.",
-      "Use the Luna task lane only when I explicitly authorize it; create user-visible GPT-5.6 Luna / Max tasks through Codex app task tools and keep primary review and acceptance in this task."
+      "Use challenge-first resolve_route; use its exact generated role and fresh exact generated advisor review.",
+      "Use the Luna task lane only if I explicitly authorize it; create visible GPT-5.6 Luna / Max tasks via Codex app tools."
     ]
   }
 }

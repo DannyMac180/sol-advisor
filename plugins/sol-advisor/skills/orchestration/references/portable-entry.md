@@ -23,6 +23,7 @@ manifest conformance.
 | Kiro IDE/CLI | Model only | Effort is session/per-model, not per-agent |
 | ChatGPT Work web, Kiro web/mobile, skills-only surfaces | Parent-chat prompt guidance only; no stored native profile | No enforceable native role binding claimed |
 
-The exact retained Codex native compatibility lane remains available when its
-separately installed roles and routing preflight pass. The Luna / Max app-task lane is
-separate, current-request opt-in only, and never a fallback.
+The retained Codex native compatibility lane is available only when the user's current
+request explicitly opts into it and its separately installed roles and routing preflight
+pass. It is never a fallback. The Luna / Max app-task lane is separate,
+current-request opt-in only, and never a fallback.
