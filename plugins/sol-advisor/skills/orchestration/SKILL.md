@@ -13,8 +13,9 @@ interview in this parent/main chat and stop orchestration until preferences vali
 Load `get_preferences` on every invocation; do not rely on remembered defaults.
 
 The orchestrator always inherits the model and reasoning setting the user selected in
-the parent chat. Never block because the parent is not Sol / High, never change it,
-and never claim it was changed. Sol / High is a recommendation only. Exact native
+the parent chat. Never block because the parent is not Luna / Max / Standard, never
+change it, and never claim it was changed. Luna / Max / Standard is a recommendation
+only. Exact native
 role model IDs and supported reasoning settings come from saved preferences. There is
 no silent fallback, translation, guessed role, or universal model enumeration.
 
@@ -59,8 +60,8 @@ capability matrix. Manifest conformance is not evidence of runtime behavior.
 
 The primary session inherits the user's current model and reasoning setting. When
 metadata exposes them, report them without treating any particular value as a gate.
-Recommend Sol / High for current Codex use, but do not stop or claim a skill can alter
-the parent selection.
+Recommend Luna / Max / Standard for current Codex use, but do not stop or claim a
+skill can alter the parent selection.
 
 ## Choose a lane
 

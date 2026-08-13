@@ -9,6 +9,10 @@ Call `get_setup_status` and `get_preferences` first. Schema-v1 state migrates
 atomically to schema v2. Never change live preferences, install adapters, or use a
 role until the user has explicitly asked for that action.
 
+For the parent chat, recommend Luna / Max / Standard. This is editable guidance, not
+a routing gate or a claim that a client can enforce it. Static Terra / Sol remains an
+opt-in Codex compatibility lane only.
+
 Call `resolve_route` with a task class first, without runtime evidence. It returns a
 cryptographically random, task/profile/tier-bound, short-lived single-use `challenge`.
 This result does not select or finalize a route. Then invoke the pathless inspector
@@ -16,6 +20,11 @@ exactly as `sh inspect-agent-runtime.sh --challenge <challenge> <thread-id>` and
 its complete camelCase JSON object directly as `currentRuntimeEvidence` or
 `targetRuntimeEvidence`, together with the same top-level `challenge`. Do not rename,
 trim, or reconstruct fields. Treat a blocked result as a stop.
+
+For agent evidence, retain the inspector's allowlisted `parentThreadId` exactly. The
+resolver accepts it only when it equals the current parent `threadId`. Inspector
+freshness and model, effort, and sandbox proof come only from complete, consistent
+authoritative `turn_context` records; later unrelated activity cannot extend it.
 
 If the current route is exact and the task is not review, use the parent result. If it
 differs, or the task is review, the result is `fresh_agent` and `spawn-required` until

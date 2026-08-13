@@ -5,6 +5,15 @@ All notable changes to Sol Advisor are documented here. This project follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Reconfiguration now preserves restrictive hard-route consent/runtime state, and
+  route evidence binds agents to the exact parent thread with complete authoritative
+  turn contexts.
+- Route challenges now precede Fast, hard-consent, and missing-effort policy output.
+- Parent guidance is Luna / Max / Standard; static Terra / Sol remains opt-in
+  compatibility only.
+
 ## [0.6.0] - 2026-08-13
 
 ### Added

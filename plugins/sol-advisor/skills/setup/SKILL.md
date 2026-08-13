@@ -34,7 +34,7 @@ Offer these current Codex recommendations as editable defaults, not universal ID
 - high: `gpt-5.6-terra`, effort `high`
 - hard: `gpt-5.6-sol`, effort `high`
 - advisor: `gpt-5.6-sol`, effort `high`, requested read-only
-- orchestrator: always `inherit`; recommend selecting Sol / High in the main chat
+- orchestrator: always `inherit`; recommend Luna / Max / Standard in the main chat
 
 Call `save_preferences` only after showing the complete logical preference object.
 All four saved roles use machine tier `default`. A migrated v1 hard role stays
@@ -54,5 +54,6 @@ scope additionally requires the exact separate user-scope token. Never treat “
 as either token.
 
 After install, tell the user to start a new chat or reload the client. Reconfiguration
-repeats the interview and exact preview. Uninstall first previews its managed files
+repeats the interview and exact preview, but preserves pending hard-route consent or
+runtime proof state. Uninstall first previews its managed files
 and exact token, then removes only the unchanged managed files after confirmation.

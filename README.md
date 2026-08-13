@@ -48,7 +48,7 @@ and four exact client-native model IDs copied from the client's picker or `/mode
 | Medium-compatible high | Medium routine work; stored as `roles.high` | `gpt-5.6-terra`, `high` |
 | Hard implementer | Security, concurrency, algorithms, hard debugging, migrations, wide refactors | `gpt-5.6-sol`, `high` |
 | Advisor | Commitment review and final diff/evidence verdict; requested read-only | `gpt-5.6-sol`, `high` |
-| Orchestrator | Parent ownership and verification | `inherit` (Sol / High recommended) |
+| Orchestrator | Parent ownership and verification | `inherit` (Luna / Max / Standard recommended) |
 
 These are editable recommendations, not a universal model catalog. Sol Advisor never
 guesses, normalizes, silently falls back, or claims a model exists in another client.
@@ -243,7 +243,9 @@ follows: routine to `routine`; medium to the `high` compatibility storage role; 
 to `hard`; and planning or review to `advisor`. The parent runs a route only when its
 current evidence is fresh, exact, and challenge-bound, and the task is not review.
 Call `resolve_route` first without evidence to obtain its expiring single-use challenge,
-then pass the inspector's complete camelCase object unchanged. Any route change requires
+then pass the inspector's complete camelCase object unchanged. Agent evidence includes
+an allowlisted `parentThreadId` that must equal the current parent `threadId`; freshness
+comes only from complete, consistent authoritative turn contexts. Any route change requires
 a fresh exact agent. `spawn-required` preserves the active challenge. Accepted parent
 or target proof consumes it. Blocked provenance, same-thread evidence, or a target
 mismatch invalidates it and requires a new route challenge.

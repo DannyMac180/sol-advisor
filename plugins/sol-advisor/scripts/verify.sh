@@ -127,7 +127,7 @@ printf '%s\n' \
   '{"timestamp":"2026-08-13T00:00:07Z","type":"event_msg","payload":{"type":"context_compacted"}}' \
   > "$runtime_file"
 runtime_output=$(CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --challenge "$runtime_challenge" "$runtime_id")
-printf '%s\n' "$runtime_output" | jq -e --arg id "$runtime_id" --arg challenge "$runtime_challenge" '.challenge==$challenge and .threadId==$id and .latestEventAt=="2026-08-13T00:00:07Z" and .evidenceSource=="codex-rollout-inspector" and .executionContext=="parent" and .agentIdentifier==null and .observedRuntimeTier=="priority" and .rawTokens==456 and .modelRounds==2 and .medianInputTokensPerRound==30 and .medianInputTokensFirst20==null and .toolCalls==1 and .compactions==1' >/dev/null || fail "runtime inspector parent evidence is incorrect"
+printf '%s\n' "$runtime_output" | jq -e --arg id "$runtime_id" --arg challenge "$runtime_challenge" '.challenge==$challenge and .threadId==$id and .parentThreadId==null and .latestEventAt=="2026-08-13T00:00:02Z" and .evidenceSource=="codex-rollout-inspector" and .executionContext=="parent" and .agentIdentifier==null and .observedRuntimeTier=="priority" and .rawTokens==456 and .modelRounds==2 and .medianInputTokensPerRound==30 and .medianInputTokensFirst20==null and .toolCalls==1 and .compactions==1' >/dev/null || fail "runtime inspector parent evidence is incorrect"
 agent_id=22222222-2222-7222-8222-222222222222
 agent_file=$runtime_home/sessions/2026/08/13/rollout-2026-08-13T00-00-00-$agent_id.jsonl
 printf '%s\n' \
@@ -135,7 +135,7 @@ printf '%s\n' \
   '{"timestamp":"2026-08-13T00:00:09Z","type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
   > "$agent_file"
 agent_output=$(CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --challenge "$runtime_challenge" "$agent_id")
-printf '%s\n' "$agent_output" | jq -e --arg id "$agent_id" '.threadId==$id and .executionContext=="agent" and .agentIdentifier=="sol_advisor_routine"' >/dev/null || fail "runtime inspector agent evidence is incorrect"
+printf '%s\n' "$agent_output" | jq -e --arg id "$agent_id" --arg parent "$runtime_id" '.threadId==$id and .parentThreadId==$parent and .executionContext=="agent" and .agentIdentifier=="sol_advisor_routine"' >/dev/null || fail "runtime inspector agent evidence is incorrect"
 mixed_parent_id=33333333-3333-7333-8333-333333333333
 mixed_parent_file=$runtime_home/sessions/2026/08/13/rollout-2026-08-13T00-00-00-$mixed_parent_id.jsonl
 printf '%s\n' \
@@ -159,6 +159,22 @@ printf '%s\n' \
   '{"timestamp":"2026-08-13T00:00:17Z","type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
   > "$parent_role_file"
 if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --challenge "$runtime_challenge" "$parent_role_id" >/dev/null 2>&1; then fail "runtime inspector accepted parent metadata with an agent role"; fi
+incomplete_turn_id=66666666-6666-7666-8666-666666666666
+incomplete_turn_file=$runtime_home/sessions/2026/08/13/rollout-2026-08-13T00-00-00-$incomplete_turn_id.jsonl
+printf '%s\n' \
+  "{\"timestamp\":\"2026-08-13T00:00:18Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"$incomplete_turn_id\"}}" \
+  '{"timestamp":"2026-08-13T00:00:19Z","type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
+  '{"timestamp":"2026-08-13T00:00:20Z","type":"turn_context","payload":{"model":"gpt-5.6-luna","sandbox_policy":{"type":"danger-full-access"}}}' \
+  > "$incomplete_turn_file"
+if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --challenge "$runtime_challenge" "$incomplete_turn_id" >/dev/null 2>&1; then fail "runtime inspector accepted incomplete authoritative turn context"; fi
+mixed_turn_id=77777777-7777-7777-8777-777777777777
+mixed_turn_file=$runtime_home/sessions/2026/08/13/rollout-2026-08-13T00-00-00-$mixed_turn_id.jsonl
+printf '%s\n' \
+  "{\"timestamp\":\"2026-08-13T00:00:21Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"$mixed_turn_id\"}}" \
+  '{"timestamp":"2026-08-13T00:00:22Z","type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
+  '{"timestamp":"2026-08-13T00:00:23Z","type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"max","sandbox_policy":{"type":"danger-full-access"}}}' \
+  > "$mixed_turn_file"
+if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --challenge "$runtime_challenge" "$mixed_turn_id" >/dev/null 2>&1; then fail "runtime inspector accepted mixed authoritative turn contexts"; fi
 if printf '%s\n' "$runtime_output" | grep -Fq DO_NOT_LEAK; then fail "runtime inspector leaked prompt canary"; fi
 if CODEX_HOME="$runtime_home" sh "$script_dir/inspect-agent-runtime.sh" --sessions-dir "$runtime_home" "$runtime_id" >/dev/null 2>&1; then fail "runtime inspector accepted an arbitrary path"; fi
 pass "pathless aggregate runtime inspection, provenance rejection, and prompt-canary privacy"
@@ -166,6 +182,10 @@ pass "pathless aggregate runtime inspection, provenance rejection, and prompt-ca
 grep -Fq 'currentRuntimeEvidence' "$routing_skill" || fail "routing skill omits current evidence"
 grep -Fq 'targetRuntimeEvidence' "$routing_skill" || fail "routing skill omits target evidence"
 grep -Fq 'fresh_agent' "$routing_skill" || fail "routing skill omits fresh-agent semantics"
+grep -Fq 'Luna / Max / Standard' "$routing_skill" || fail "routing skill omits parent recommendation"
+grep -Fq 'Luna / Max / Standard' "$skill" || fail "orchestration skill omits parent recommendation"
+grep -Fq 'Luna / Max / Standard' "$contracts" || fail "role contracts omit parent recommendation"
+grep -Fq 'Luna / Max / Standard' "$plugin_dir/skills/setup/SKILL.md" || fail "setup skill omits parent recommendation"
 readme_text=$(tr '\n' ' ' < "$readme")
 grep -Fq 'sol-advisor-hard' "$readme" || fail "README omits hard role"
 grep -Fq 'Its nine tools are:' "$readme" || fail "README tool count is stale"
@@ -176,6 +196,7 @@ printf '%s\n' "$readme_text" | grep -Fq '`spawn-required` preserves the active c
 grep -Fq 'Reviews are always fresh and read-only' "$readme" || fail "README review rule is stale"
 if grep -Eq 'all eight tools|these eight enabled tools' "$readme"; then fail "README stale eight-tool wording remains"; fi
 grep -Fq 'four generated files' "$readme" || fail "README generated-file count is stale"
+grep -Fq 'Luna / Max / Standard recommended' "$readme" || fail "README parent recommendation is stale"
 pass "four-role MCP/runtime fixture and documentation contracts"
 
 sh -n "$script_dir/install-agents.sh"

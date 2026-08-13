@@ -3,6 +3,8 @@
 ## Schema-v2 general routes
 
 Use `$sol-advisor:routing` and challenge-first `resolve_route` before a general native route.
+Recommend Luna / Max / Standard for the parent chat. This is guidance only; static
+Terra / Sol is an opt-in compatibility lane, not a general-route fallback.
 Routine maps to routine, medium maps to the compatibility `high` storage role, hard
 maps to hard, and planning/review map to advisor. Review is always fresh and
 read-only only with observed evidence. Keep `fork_context=false` and parallelism at
