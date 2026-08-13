@@ -188,6 +188,7 @@ grep -Fq 'currentRuntimeEvidence' "$routing_skill" || fail "routing skill omits 
 grep -Fq 'targetRuntimeEvidence' "$routing_skill" || fail "routing skill omits target evidence"
 grep -Fq 'fresh_agent' "$routing_skill" || fail "routing skill omits fresh-agent semantics"
 grep -Fq 'Luna / Max / Standard' "$routing_skill" || fail "routing skill omits parent recommendation"
+grep -Fq 'may immediately precede challenge issuance' "$routing_skill" || fail "routing skill omits current-parent pre-challenge freshness rule"
 grep -Fq 'Luna / Max / Standard' "$skill" || fail "orchestration skill omits parent recommendation"
 grep -Fq 'Luna / Max / Standard' "$contracts" || fail "role contracts omit parent recommendation"
 grep -Fq 'Luna / Max / Standard' "$plugin_dir/skills/setup/SKILL.md" || fail "setup skill omits parent recommendation"
@@ -220,6 +221,7 @@ grep -Fq 'Reviews are always fresh and read-only' "$readme" || fail "README revi
 if grep -Eq 'all eight tools|these eight enabled tools' "$readme"; then fail "README stale eight-tool wording remains"; fi
 grep -Fq 'four generated files' "$readme" || fail "README generated-file count is stale"
 grep -Fq 'Luna / Max / Standard recommended' "$readme" || fail "README parent recommendation is stale"
+grep -Fq 'post-challenge' "$readme" || fail "README omits target post-challenge freshness rule"
 grep -Fq 'Schema-v2 native default' "$readme" || fail "README omits schema-v2 native default"
 grep -Fq 'Codex compatibility (explicit opt-in)' "$readme" || fail "README omits explicit compatibility lane"
 if printf '%s\n' "$readme_text" | grep -Fq 'The native lane remains the default for the exact retained Codex compatibility workflow'; then fail "README still makes compatibility the native default"; fi

@@ -245,8 +245,10 @@ current evidence is fresh, exact, and challenge-bound, and the task is not revie
 Call `resolve_route` first without evidence to obtain its expiring single-use challenge,
 then pass the inspector's complete camelCase object unchanged. Agent evidence includes
 an allowlisted `parentThreadId` that must equal the current parent `threadId`; freshness
-comes only from complete, consistent authoritative turn contexts. Any route change requires
-a fresh exact agent. `spawn-required` preserves the active challenge. Accepted parent
+comes only from complete, consistent authoritative turn contexts. A current parent
+context may immediately predate challenge issuance, but at resolution must be no older
+than five minutes and no later than bounded future-clock skew; target evidence must be
+post-challenge. Any route change requires a fresh exact agent. `spawn-required` preserves the active challenge. Accepted parent
 or target proof consumes it. Blocked provenance, same-thread evidence, or a target
 mismatch invalidates it and requires a new route challenge.
 Reviews are always fresh and read-only, with runtime evidence required before use. Sol

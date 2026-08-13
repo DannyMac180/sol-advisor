@@ -15,6 +15,8 @@ All notable changes to Sol Advisor are documented here. This project follows
   compatibility only.
 - Schema-v2 challenge-first generated routing is the default orchestration path;
   static Terra/Sol preflight, correction, and review are compatibility-only.
+- Current-parent authoritative contexts may predate challenge issuance within a strict
+  five-minute resolution-age bound; target-agent proof remains post-challenge.
 
 ## [0.6.0] - 2026-08-13
 

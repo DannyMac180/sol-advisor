@@ -24,7 +24,9 @@ trim, or reconstruct fields. Treat a blocked result as a stop.
 For agent evidence, retain the inspector's allowlisted `parentThreadId` exactly. The
 resolver accepts it only when it equals the current parent `threadId`. Inspector
 freshness and model, effort, and sandbox proof come only from complete, consistent
-authoritative `turn_context` records; later unrelated activity cannot extend it.
+authoritative `turn_context` records; later unrelated activity cannot extend it. A
+current parent context may immediately precede challenge issuance, but at resolution it
+must be no older than five minutes and no later than the bounded future-clock skew.
 
 If the current route is exact and the task is not review, use the parent result. If it
 differs, or the task is review, the result is `fresh_agent` and `spawn-required` until
