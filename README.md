@@ -254,20 +254,23 @@ Advisor reports the observed guarantee rather than inventing one.
 
 The historical exact Codex native compatibility lane remains separate: it uses a
 separately installed Terra / High implementer and a fresh Sol / High reviewer. It
-does not use a Luna custom-agent TOML. The Luna lane instead uses app task tools and
-is outside native subagent V2.
+is available only after explicit current-request opt-in, never as a fallback. It does
+not use a Luna custom-agent TOML. The Luna lane instead uses app task tools and is
+outside native subagent V2.
 
 | Mode | Worker | Parent ownership |
 |---|---|---|
-| Native lane | Saved routine/high role, then saved advisor role | Architecture, diff/check verification, corrections, acceptance |
+| Schema-v2 native default | Exact generated `routine`/`high`/`hard`/`advisor` role returned by challenge-first `resolve_route` | Architecture, diff/check verification, corrections, acceptance |
+| Codex compatibility (explicit opt-in) | Static Terra / High implementer and fresh Sol / High reviewer | Architecture, diff/check verification, corrections, acceptance |
 | Luna task (explicit opt-in) | User-visible `gpt-5.6-luna` / Max task | Monitoring, diff review, corrections, PR authorization, dependent ordering |
 
 Use the Luna task lane only with current-request authorization such as: **“Use the
 Luna task lane for this feature.”** It requires `list_projects`, `list_threads`,
 `create_thread`, `wait_threads`, `read_thread`, and `send_message_to_thread`. A pending
 `clientThreadId` is a setup handle, not a ready task ID. Missing tools, Luna, or Max
-stop without fallback. The native lane remains the default for the exact retained
-Codex compatibility workflow and does not use a Luna companion file.
+stop without fallback. The schema-v2 generated route is the native default. The static
+Codex compatibility lane requires explicit current-request opt-in and does not use a
+Luna companion file.
 
 ### Requirements common to both modes
 
@@ -275,22 +278,24 @@ Codex compatibility workflow and does not use a Luna companion file.
 - A compatible plugin client and exact user-selected model access.
 - Parent ownership of verification and acceptance.
 
-### Additional native-mode requirements
+### Additional schema-v2 native-mode requirements
 
-- Codex native custom-agent support and the separately installed exact roles.
-- Observable runtime routing; no unverified model/effort claim.
-- `jq` for the retained companion lookup/install script.
+- A compatible native spawn tool exposing the exact generated role.
+- Fresh, challenge-bound observable runtime routing; no unverified model/effort claim.
 
 ### Additional Luna task-mode requirements
 
 - Explicit authorization in the current request.
 - Luna / Max availability and all six app task tools.
 
-The native companion installation can be skipped for Luna-only use. Luna tasks do not require native subagents, Terra access, or companion TOML files. Luna-only users do not need to run `scripts/install-agents.sh`.
+The native companion installation is required only for explicit Codex compatibility-lane
+use. Luna tasks do not require native subagents, Terra access, or companion TOML files.
+Luna-only users do not need to run `scripts/install-agents.sh`.
 
 ## Retained Codex companion lane
 
-For exact legacy-compatible native use:
+Only after the user's current request explicitly opts into this exact legacy-compatible
+native lane:
 
 ~~~sh
 plugin_dir="$(codex plugin list --json | jq -r '.installed[] | select(.pluginId == "sol-advisor@sol-advisor") | .source.path')"

@@ -13,6 +13,8 @@ All notable changes to Sol Advisor are documented here. This project follows
 - Route challenges now precede Fast, hard-consent, and missing-effort policy output.
 - Parent guidance is Luna / Max / Standard; static Terra / Sol remains opt-in
   compatibility only.
+- Schema-v2 challenge-first generated routing is the default orchestration path;
+  static Terra/Sol preflight, correction, and review are compatibility-only.
 
 ## [0.6.0] - 2026-08-13
 

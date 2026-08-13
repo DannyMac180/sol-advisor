@@ -15,6 +15,11 @@ bounded Luna/max routine route only; it requests priority tier and restarts at
 Luna/default if work expands. Do not substitute the static Terra/Sol compatibility
 aliases for a blocked route.
 
+For every general review, correction, or commitment boundary, obtain a new
+challenge-first resolver result and use its exact generated role; review resolves to
+the generated advisor role. Static Terra/Sol roles are unavailable unless the user's
+current request explicitly opts into the retained Codex compatibility lane.
+
 Use these contracts with Sol Advisor's namespaced, role-pinned native custom agents.
 They do not launch a nested Codex CLI or change global default-subagent routing. The
 separate [Luna task-lane contract](luna-task-lane.md) covers user-visible app tasks;
@@ -30,17 +35,17 @@ and parallelism one. Obtain fresh, single-use challenge-bound inspector evidence
 accepting parent or target placement. Capture observed sandbox and permission profile
 types for reviews.
 
-The static Terra/Sol companion check applies only to the retained Codex compatibility
-lane. There, require the non-mutating companion check, exact exposure of
+The static Terra/Sol companion check applies only after explicit current-request opt-in
+to the retained Codex compatibility lane. There, require the non-mutating companion check, exact exposure of
 `sol_advisor_terra_implementer` and `sol_advisor_sol_reviewer`, and public runtime
 metadata. General schema-v2 generated roles do not require those static companions.
 A missing, stale, unsafe, conflicting, unavailable, inconsistent, or unobservable role,
 model, effort, or isolation guarantee stops its applicable lane. Never silently fall
 back. Model and effort are pinned by custom-agent TOML, so omit per-spawn overrides.
 
-## Shared implementation contract
+## Shared schema-v2 generated-role implementation contract
 
-Every Terra prompt must contain all five sections:
+Every schema-v2 generated-role prompt must contain all five sections:
 
 ~~~text
 OBJECTIVE
@@ -116,11 +121,11 @@ concurrent; shared-file and dependent stacks are serial. Worktree isolation alon
 not merge safety, and “report back” means explicit primary monitoring/read, not an
 automatic callback.
 
-## Terra / High - sole native implementation lane
+## Explicit retained Codex compatibility lane: Terra / High
 
-Use this lane for every delegated native implementation, from routine edits through
-complex, security-sensitive, context-heavy, and broad work. It is not the Luna
-task-lane implementation path.
+Use this lane only when the user's current request explicitly opts into the retained
+Codex compatibility lane. It is not the schema-v2 general default, does not handle a
+blocked general route, and is separate from the Luna task lane.
 
 Spawn exactly:
 
@@ -144,9 +149,10 @@ surface ambiguity instead of redesigning the architecture.
 <paste and complete the Shared implementation contract>
 ~~~
 
-## Fresh Sol - requested-read-only final reviewer
+## Explicit compatibility-lane fresh Sol reviewer
 
-After parent verification, spawn a new native thread exactly:
+Only after explicit current-request compatibility opt-in and parent verification, spawn
+a new native thread exactly:
 
 ~~~text
 agent_type: sol_advisor_sol_reviewer
@@ -200,9 +206,10 @@ Use observed isolation, not requested isolation:
 - If isolation is unobservable, hard isolation is required, or any mutation occurs,
   stop the lane and do not hide or repair the mutation under that verdict.
 
-## Commitment-boundary Sol consult
+## Compatibility-lane commitment-boundary Sol consult
 
-For pre-implementation review, spawn the same fresh Sol role with `fork_turns: none`.
+Only after explicit current-request compatibility opt-in, pre-implementation review may
+spawn the same fresh Sol role with `fork_turns: none`.
 Give it the proposed decision, goal, constraints, relevant paths, alternatives, and the
 one question that changes the plan. Require `proceed`, `change`, or `stop`, plus the
 decisive reason and largest risk. Apply the same preflight, runtime-observation,

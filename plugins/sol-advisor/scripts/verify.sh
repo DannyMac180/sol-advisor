@@ -19,6 +19,8 @@ templates=$plugin_dir/agents
 skill=$plugin_dir/skills/orchestration/SKILL.md
 routing_skill=$plugin_dir/skills/routing/SKILL.md
 contracts=$plugin_dir/skills/orchestration/references/role-contracts.md
+agent_config=$plugin_dir/skills/orchestration/agents/openai.yaml
+luna_contract=$plugin_dir/skills/orchestration/references/luna-task-lane.md
 readme=$repo_dir/README.md
 terra_file=sol-advisor-terra-implementer.toml
 sol_file=sol-advisor-sol-reviewer.toml
@@ -186,6 +188,20 @@ grep -Fq 'Luna / Max / Standard' "$routing_skill" || fail "routing skill omits p
 grep -Fq 'Luna / Max / Standard' "$skill" || fail "orchestration skill omits parent recommendation"
 grep -Fq 'Luna / Max / Standard' "$contracts" || fail "role contracts omit parent recommendation"
 grep -Fq 'Luna / Max / Standard' "$plugin_dir/skills/setup/SKILL.md" || fail "setup skill omits parent recommendation"
+grep -Fq 'The default native' "$skill" || fail "orchestration skill omits the schema-v2 native default"
+grep -Fq 'challenge-first `resolve_route`' "$skill" || fail "orchestration skill omits challenge-first default routing"
+grep -Fq 'only when the user' "$skill" || fail "orchestration skill omits explicit compatibility opt-in"
+grep -Fq 'Every schema-v2 generated-role prompt' "$contracts" || fail "role contracts omit generated-role default prompt contract"
+grep -Fq 'Only after explicit current-request compatibility opt-in' "$contracts" || fail "role contracts omit static compatibility gate"
+grep -Fq 'exact schema-v2 role' "$agent_config" || fail "orchestration agent prompt omits schema-v2 routing"
+grep -Fq 'inherits the user' "$luna_contract" || fail "Luna contract omits inherited parent setting"
+orchestration_text=$(tr '\n' ' ' < "$skill")
+contracts_text=$(tr '\n' ' ' < "$contracts")
+if printf '%s\n' "$orchestration_text" | grep -Fq 'The default native lane delegates implementation to Terra / High'; then fail "orchestration default still routes through static Terra"; fi
+if printf '%s\n' "$orchestration_text" | grep -Fq 'For the native lane, delegate corrections through Terra'; then fail "orchestration corrections still route through static Terra"; fi
+if printf '%s\n' "$orchestration_text" | grep -Fq 'After native implementation and parent verification, always spawn a new, fresh reviewer'; then fail "orchestration final review still requires static Sol"; fi
+if printf '%s\n' "$contracts_text" | grep -Fq 'Terra / High - sole native implementation lane'; then fail "role contracts still describe Terra as the sole native lane"; fi
+if printf '%s\n' "$contracts_text" | grep -Fq 'Use this lane for every delegated native implementation'; then fail "role contracts still make static Terra the general default"; fi
 readme_text=$(tr '\n' ' ' < "$readme")
 grep -Fq 'sol-advisor-hard' "$readme" || fail "README omits hard role"
 grep -Fq 'Its nine tools are:' "$readme" || fail "README tool count is stale"
@@ -197,6 +213,9 @@ grep -Fq 'Reviews are always fresh and read-only' "$readme" || fail "README revi
 if grep -Eq 'all eight tools|these eight enabled tools' "$readme"; then fail "README stale eight-tool wording remains"; fi
 grep -Fq 'four generated files' "$readme" || fail "README generated-file count is stale"
 grep -Fq 'Luna / Max / Standard recommended' "$readme" || fail "README parent recommendation is stale"
+grep -Fq 'Schema-v2 native default' "$readme" || fail "README omits schema-v2 native default"
+grep -Fq 'Codex compatibility (explicit opt-in)' "$readme" || fail "README omits explicit compatibility lane"
+if printf '%s\n' "$readme_text" | grep -Fq 'The native lane remains the default for the exact retained Codex compatibility workflow'; then fail "README still makes compatibility the native default"; fi
 pass "four-role MCP/runtime fixture and documentation contracts"
 
 sh -n "$script_dir/install-agents.sh"
