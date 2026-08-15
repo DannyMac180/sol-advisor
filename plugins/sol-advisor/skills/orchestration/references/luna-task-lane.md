@@ -36,6 +36,24 @@ authority, and final acceptor.
    tree or an existing branch as the starting state unless the primary explicitly
    chooses that state. When using an existing branch for a dependent stack, the branch
    must already exist; `startingState` is not a way to name a new branch.
+
+   Use this argument shape for a Git project:
+
+   <!-- canonical-create-thread-project-arguments -->
+   ```json
+   {
+     "target": {
+       "type": "project",
+       "projectId": "<projectId>",
+       "environment": { "type": "worktree" }
+     },
+     "model": "gpt-5.6-luna",
+     "thinking": "max",
+     "prompt": "<complete packet>"
+   }
+   ```
+
+   `projectId` belongs inside `target`; a top-level `projectId` is invalid.
 4. Accept task-lane routing only from accepted `create_thread` routing plus the
    returned task identity. If the app supplies model, thinking, host, worktree, or
    branch metadata, report those observed values; never infer unavailable runtime
