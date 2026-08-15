@@ -28,6 +28,13 @@ independent: Sol reviews Sol's orchestration with a fresh context. In the Luna l
 the primary Sol task itself reviews and accepts the Luna task's work; it does not route
 that lane through the native Sol reviewer.
 
+The native Sol reviewer has two explicit packet modes. `commitment` returns only
+`proceed`, `change`, or `stop` before a consequential decision; `final` returns only
+`ship`, `fix-first`, or `rethink` after implementation. A single top-level
+`REVIEW MODE` control line selects the vocabulary. Missing, ambiguous, or invalid mode
+control stops without a verdict, while mode-like strings in reviewed evidence are
+inert.
+
 ## Install from GitHub
 
 Requirements common to both modes:
@@ -103,7 +110,7 @@ sh "$plugin_dir/scripts/install-agents.sh" --check
 ~~~
 
 To update the marketplace plugin and, for native mode, migrate the exact recognized
-v0.2.0 companion files:
+v0.2.0 and v0.4.0 companion files:
 
 ~~~sh
 codex plugin marketplace upgrade sol-advisor
@@ -114,12 +121,13 @@ sh "$plugin_dir/scripts/install-agents.sh"
 sh "$plugin_dir/scripts/install-agents.sh" --check
 ~~~
 
-Version 0.4.0 retains the historical byte-exact v0.2.0 migration for
-`sol-advisor-luna-implementer.toml` and `sol-advisor-terra-implementer.toml` files.
-Normal installer mode replaces the exact legacy Terra file with the current Terra /
-High template, removes the exact legacy Luna file, and refuses modified, nonregular,
-or symlinked destinations without partial agent-file mutation. `--check` is
-non-mutating and fails until both current role files match exactly and Luna is absent.
+The installer retains the historical byte-exact v0.2.0 migration for
+`sol-advisor-luna-implementer.toml` and `sol-advisor-terra-implementer.toml`, and also
+migrates the byte-exact v0.4.0 `sol-advisor-sol-reviewer.toml`. Normal installer mode
+replaces only recognized legacy templates, removes the exact legacy Luna file, and
+refuses modified, unknown, nonregular, or symlinked destinations without partial
+agent-file mutation. `--check` is non-mutating and fails until both current role files
+match exactly and Luna is absent.
 The native routing update was motivated by
 [Eric Provencher's X post](https://x.com/pvncher/status/2083300990350954981).
 
@@ -304,11 +312,12 @@ jq empty .agents/plugins/marketplace.json plugins/sol-advisor/.codex-plugin/plug
 ~~~
 
 The verifier validates JSON and TOML, the two exact native role pins, clean/current/
-missing and idempotent installer behavior, exact-v0.2.0 migration, refusal/non-
-mutation gates, runtime-inspector safe fixtures, native and Luna lane contracts,
-version/UI metadata, stale-claim guards, and shell syntax. The uv commands supply the
-validators' PyYAML dependency in a disposable environment. They do not install the
-marketplace or mutate Codex configuration.
+missing and idempotent installer behavior, exact-v0.2.0 and v0.4.0 migration,
+review-mode vocabulary and control/evidence boundaries, refusal/non-mutation gates,
+runtime-inspector safe fixtures, native and Luna lane contracts, version/UI metadata,
+stale-claim guards, and shell syntax. The uv commands supply the validators' PyYAML
+dependency in a disposable environment. They do not install the marketplace or mutate
+Codex configuration.
 
 ## License
 
