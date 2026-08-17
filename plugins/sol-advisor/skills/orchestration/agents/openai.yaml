@@ -1,4 +1,4 @@
 interface:
   display_name: "Sol Advisor Orchestration"
-  short_description: "Declare a risk-gated solo, delegate, audit, or exceptional full route before task tools"
-  default_prompt: "Use $orchestration to declare a SELECTIVE ROUTE before task tools; default to solo and select delegation, audit, or exceptional full only when risk justifies it."
+  short_description: "Declare a risk-gated route; use Luna, Terra, or routed DeepSeek when justified"
+  default_prompt: "Use $orchestration to declare SELECTIVE ROUTE before task tools; default to solo and select Luna, Terra, DeepSeek, audit, or full only when risk justifies it."

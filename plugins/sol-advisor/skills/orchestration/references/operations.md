@@ -12,6 +12,7 @@ The installed TOMLs are the source of truth:
 |---|---|---|---|
 | sol_advisor_luna_implementer | gpt-5.6-luna | max | Delegate/full bounded routine implementation |
 | sol_advisor_terra_implementer | gpt-5.6-terra | high | Delegate/full judgment-heavy or high-risk implementation |
+| sol_advisor_deepseek_implementer | deepseek/deepseek-v4-flash | max | Delegate/full bounded capability-gated implementation |
 | sol_advisor_sol_reviewer | gpt-5.6-sol | high | Audit/full fresh review; requests read-only sandbox |
 
 Native spawn requests name the role and use a fresh context:
@@ -28,6 +29,14 @@ agent_type: sol_advisor_terra_implementer
 fork_turns: none
 ~~~
 
+Use the DeepSeek type only when the selected delegate or full route verifies its exact
+routed capability:
+
+~~~text
+agent_type: sol_advisor_deepseek_implementer
+fork_turns: none
+~~~
+
 Use a fresh Sol reviewer only for audit or full after parent verification:
 
 ~~~text
@@ -35,7 +44,8 @@ agent_type: sol_advisor_sol_reviewer
 fork_turns: none
 ~~~
 
-Do not attach model or reasoning overrides. A missing, conflicting, unavailable, or
+Do not attach model or reasoning overrides. Except for the reported automatic pre-work
+DeepSeek-to-Terra reroute defined below, a missing, conflicting, unavailable, or
 unobservable role/model/effort is a hard stop; never substitute another role.
 
 ## Selective route declaration, preflight, and caching
@@ -61,8 +71,8 @@ sh "$installer" --check
 ~~~
 
 The installer is fail-closed and performs its own post-install exactness check. It
-recognizes only byte-exact historical templates, including the shipped v0.2.0 profiles
-and the v0.5.0 Luna/Terra profiles during a v0.5.1 update. Modified/unsafe/nonregular/
+recognizes only byte-exact historical templates, including the shipped v0.2.0 profiles,
+the v0.4.0 Terra profile, and the v0.5.0 Luna/Terra profiles during an update. Modified/unsafe/nonregular/
 symlinked/conflicting destinations remain refusals, and all mutations are preflighted.
 
 The root emits one machine-auditable declaration before its first task tool call:
@@ -78,7 +88,7 @@ or high-risk exception. The root may emit a later declaration only to escalate w
 newly observed risk justifies it. It records that evidence and never silently
 downgrades.
 
-The existing --check flag verifies all three roles. For task-scoped preflight, check
+The existing --check flag verifies all four roles. For task-scoped preflight, check
 only the auxiliaries selected by the declaration; every check is non-mutating and
 fail-closed:
 
@@ -87,9 +97,11 @@ fail-closed:
 | solo | None |
 | delegate (Luna) | `--check --check-role luna` |
 | delegate (Terra) | `--check --check-role terra` |
+| delegate (DeepSeek) | `--check --check-role deepseek` |
 | audit | `--check --check-role sol` |
 | full (Luna) | `--check --check-role luna --check-role sol` |
 | full (Terra) | `--check --check-role terra --check-role sol` |
+| full (DeepSeek) | `--check --check-role deepseek --check-role sol` |
 
 For example:
 
@@ -104,10 +116,12 @@ remains unchanged. Cache successful checks only for the task; never carry them a
 later tasks, installation/update, or routing/configuration changes.
 
 Luna / Max is for bounded, fully specified work. Terra / High is selected for
-judgment-heavy, high-risk, context-heavy, or wide-blast-radius work. A Luna result
-may justify a declared Terra escalation only when it shows newly observed risk. One
-corrected Luna attempt is reserved for a specification error and is not a prerequisite
-for Terra.
+judgment-heavy, high-risk, context-heavy, or wide-blast-radius work. DeepSeek / Max is
+selected only for bounded, fully specified work when its exact routed capability is
+verified; an explicit request fails closed, while an automatic pre-work routing failure
+may be reported before preflighting and selecting Terra. A Luna result may justify a
+declared Terra escalation only when it shows newly observed risk. One corrected Luna
+attempt is reserved for a specification error and is not a prerequisite for Terra.
 
 If public metadata omits model or effort, use the local inspector below as a fallback
 for those omitted fields only. Do not use it to replace available public evidence.
@@ -137,7 +151,8 @@ prompts, messages, environment variables, tokens, configuration, or arbitrary ro
 payloads.
 
 Accepted routing is Luna / max for bounded delegate/full implementation, Terra / high
-for higher-risk delegate/full implementation, and Sol / high for audit/full review.
+for higher-risk delegate/full implementation, DeepSeek / max for bounded delegate/full
+implementation when its exact role is verified, and Sol / high for audit/full review.
 If public and local evidence both exist, they must agree. The local inspector is not a
 model-selection fallback.
 
@@ -158,7 +173,7 @@ verdict; parent verification and a new fresh review are required.
 
 ## Worker packet and parent acceptance
 
-Every Luna or Terra prompt uses the five-part packet in role-contracts.md:
+Every Luna, DeepSeek, or Terra prompt uses the five-part packet in role-contracts.md:
 
 - OBJECTIVE
 - FILES AND OWNERSHIP
@@ -171,9 +186,9 @@ complete diff inspection, verification reruns, correction/escalation decisions, 
 acceptance. Worker claims never replace direct inspection.
 
 In solo, the root plans, implements, tests, and self-reviews with no auxiliary. In
-delegate, one selected Luna or Terra implementer completes the spec and the root
-verifies with no fresh reviewer. In audit, the root implements and verifies, then a
-fresh Sol reviewer reviews. In full, one selected implementer completes the spec, the
+delegate, one selected Luna, Terra, or DeepSeek implementer completes the spec and the
+root verifies with no fresh reviewer. In audit, the root implements and verifies, then
+a fresh Sol reviewer reviews. In full, one selected implementer completes the spec, the
 root verifies, and a fresh Sol reviewer reviews. Auxiliary work substitutes for root
 work; it does not duplicate it. A reviewer never fixes its own findings.
 
@@ -188,6 +203,6 @@ git status --short
 git diff --stat
 ~~~
 
-The verifier covers the v0.6.0 manifest, exact three-role TOMLs, selective-routing
+The verifier covers the v0.6.0 manifest, exact four-role TOMLs, selective-routing
 contracts, concise README journey, absence of retired workflow references, installer
 safety fixtures, Luna runtime evidence, JSON/TOML validity, and shell syntax.

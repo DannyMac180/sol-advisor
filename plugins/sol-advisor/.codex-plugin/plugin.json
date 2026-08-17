@@ -1,7 +1,7 @@
 {
   "name": "sol-advisor",
   "version": "0.6.0",
-  "description": "Codex-native selective routing: Sol / High declares solo, delegate, audit, or exceptional full delivery before work begins.",
+  "description": "Codex-native selective routing with capability-gated DeepSeek, Luna, Terra, and fresh Sol review roles.",
   "author": {"name": "Daniel McAteer", "url": "https://github.com/DannyMac180"},
   "homepage": "https://github.com/DannyMac180/sol-advisor#readme",
   "repository": "https://github.com/DannyMac180/sol-advisor",
@@ -11,11 +11,11 @@
   "interface": {
     "displayName": "Sol Advisor",
     "shortDescription": "Plan with Sol / High, declare a risk-gated route, and use at most one auxiliary by default.",
-    "longDescription": "Sol Advisor keeps GPT-5.6 Sol / High in the primary session for architecture, implementation when solo or audit is selected, verification, and acceptance. Before the first task tool call, Sol declares a machine-auditable SELECTIVE ROUTE: solo is the default; delegate uses native GPT-5.6 Luna / Max for bounded work or GPT-5.6 Terra / High for higher-risk work; audit uses a fresh read-only GPT-5.6 Sol / High review; full combines one selected implementer with a fresh review only for a broad or high-risk exception. Public role metadata is authoritative and missing, conflicting, unavailable, or unobservable routing evidence fails closed.",
+    "longDescription": "Sol Advisor keeps GPT-5.6 Sol / High in the primary session for architecture, implementation when solo or audit is selected, verification, and acceptance. Before the first task tool call, Sol declares a machine-auditable SELECTIVE ROUTE: solo is the default; delegate uses native GPT-5.6 Luna / Max for bounded work, GPT-5.6 Terra / High for higher-risk work, or capability-gated deepseek/deepseek-v4-flash / Max when that route is verified; audit uses a fresh read-only GPT-5.6 Sol / High review; full combines one selected implementer with a fresh review only for a broad or high-risk exception. Explicit DeepSeek requests fail closed, while an automatic pre-work routing failure may be reported before selecting Terra. Public role metadata is authoritative and missing, conflicting, unavailable, or unobservable routing evidence fails closed.",
     "developerName": "Daniel McAteer",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
     "websiteURL": "https://github.com/DannyMac180/sol-advisor",
-    "defaultPrompt": ["Use $sol-advisor:orchestration to declare a SELECTIVE ROUTE before task tools, then build and verify this feature.", "Use solo by default; select delegate, audit, or exceptional full only when the stated risk justifies it."]
+    "defaultPrompt": ["Use $sol-advisor:orchestration to declare SELECTIVE ROUTE before task tools, then build and verify this feature.", "Use solo by default; choose Luna, Terra, routed DeepSeek, audit, or full only when justified."]
   }
 }
