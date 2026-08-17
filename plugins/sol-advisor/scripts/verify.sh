@@ -195,7 +195,7 @@ jq empty "$manifest"
 grep -Fq 'SELECTIVE ROUTE' "$manifest" || fail "manifest omits route declaration"
 grep -Fq 'solo is the default' "$manifest" || fail "manifest omits solo default"
 grep -Fq 'delegate uses native GPT-5.6 Luna / Max' "$manifest" || fail "manifest omits delegate role contract"
-grep -Fq 'capability-gated deepseek/deepseek-v4-flash / High' "$manifest" || fail "manifest omits DeepSeek role contract"
+grep -Fq 'capability-gated deepseek/deepseek-v4-flash / Max' "$manifest" || fail "manifest omits DeepSeek role contract"
 grep -Fq 'audit uses a fresh read-only GPT-5.6 Sol / High review' "$manifest" || fail "manifest omits audit contract"
 grep -Fq 'full combines one selected implementer' "$manifest" || fail "manifest omits exceptional full contract"
 grep -Fq 'fails closed' "$manifest" || fail "manifest omits fail-closed evidence rule"
@@ -232,7 +232,7 @@ expected = {
     "sol-advisor-deepseek-implementer.toml": {
         "name": "sol_advisor_deepseek_implementer",
         "model": "deepseek/deepseek-v4-flash",
-        "model_reasoning_effort": "high",
+        "model_reasoning_effort": "max",
     },
     "sol-advisor-sol-reviewer.toml": {
         "name": "sol_advisor_sol_reviewer",
@@ -448,17 +448,18 @@ deepseek_rollout=$runtime_day/rollout-2026-08-15T00-00-01-$deepseek_id.jsonl
 printf '%s\n' \
   '{"type":"response_item","payload":{"prompt":"DO_NOT_LEAK_DEEPSEEK_PROMPT"}}' \
   "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$deepseek_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"agent_role\":\"sol_advisor_deepseek_implementer\",\"agent_path\":\"/root/fixture\",\"model_provider\":\"deepseek\",\"cwd\":\"/fixture\"}}" \
-  '{"type":"turn_context","payload":{"model":"deepseek/deepseek-v4-flash","effort":"high","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
+  '{"type":"turn_context","payload":{"model":"deepseek/deepseek-v4-flash","effort":"max","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
   > "$deepseek_rollout"
 deepseek_output=$(sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$deepseek_id")
 printf '%s\n' "$deepseek_output" | jq -e --arg id "$deepseek_id" '
   .thread_id == $id and .agent_role == "sol_advisor_deepseek_implementer"
-  and .model == "deepseek/deepseek-v4-flash" and .effort == "high"
+  and .model_provider == "deepseek"
+  and .model == "deepseek/deepseek-v4-flash" and .effort == "max"
   and .sandbox_policy_type == "danger-full-access"
   and .permission_profile_type == "disabled"
-' >/dev/null || fail "runtime inspector returned wrong DeepSeek/High evidence"
+' >/dev/null || fail "runtime inspector returned wrong DeepSeek/Max evidence"
 if printf '%s\n' "$deepseek_output" | grep -Fq DO_NOT_LEAK; then fail "runtime inspector leaked DeepSeek payload"; fi
-pass "runtime inspector DeepSeek/High routing"
+pass "runtime inspector DeepSeek/Max routing"
 
 for document in "$contracts" "$operations"; do
   grep -Fq 'agent_type: sol_advisor_luna_implementer' "$document" || fail "missing Luna spawn in $document"
@@ -472,6 +473,8 @@ done
 grep -Fq 'references/operations.md' "$skill" || fail "skill does not link operations reference"
 grep -Fq 'deepseek-native-lane.md' "$skill" || fail "skill does not link DeepSeek contract"
 grep -Fq 'deepseek-native-lane.md' "$contracts" || fail "role contracts do not link DeepSeek contract"
+grep -Fq 'bounded, fully specified work' "$deepseek_contract" || fail "DeepSeek contract omits bounded-work gate"
+grep -Fq "run Terra's task-scoped preflight" "$deepseek_contract" || fail "DeepSeek fallback omits Terra preflight"
 for document in "$skill" "$contracts" "$deepseek_contract" "$readme"; do
   grep -Fq 'deepseek/deepseek-v4-flash' "$document" || fail "$document omits the exact DeepSeek model"
 done

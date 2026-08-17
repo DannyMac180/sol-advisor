@@ -12,7 +12,7 @@ The installed TOMLs are the source of truth:
 |---|---|---|---|
 | sol_advisor_luna_implementer | gpt-5.6-luna | max | Delegate/full bounded routine implementation |
 | sol_advisor_terra_implementer | gpt-5.6-terra | high | Delegate/full judgment-heavy or high-risk implementation |
-| sol_advisor_deepseek_implementer | deepseek/deepseek-v4-flash | high | Delegate/full capability-gated implementation |
+| sol_advisor_deepseek_implementer | deepseek/deepseek-v4-flash | max | Delegate/full bounded capability-gated implementation |
 | sol_advisor_sol_reviewer | gpt-5.6-sol | high | Audit/full fresh review; requests read-only sandbox |
 
 Native spawn requests name the role and use a fresh context:
@@ -115,8 +115,8 @@ remains unchanged. Cache successful checks only for the task; never carry them a
 later tasks, installation/update, or routing/configuration changes.
 
 Luna / Max is for bounded, fully specified work. Terra / High is selected for
-judgment-heavy, high-risk, context-heavy, or wide-blast-radius work. DeepSeek / High is
-selected only when its exact routed capability is verified; an explicit request fails
+judgment-heavy, high-risk, context-heavy, or wide-blast-radius work. DeepSeek / Max is
+selected only for bounded, fully specified work when its exact routed capability is verified; an explicit request fails
 closed, while an automatic pre-work routing failure may be reported before selecting
 Terra. A Luna result may justify a declared Terra escalation only when it shows newly
 observed risk. One corrected Luna attempt is reserved for a specification error and is
@@ -150,8 +150,8 @@ prompts, messages, environment variables, tokens, configuration, or arbitrary ro
 payloads.
 
 Accepted routing is Luna / max for bounded delegate/full implementation, Terra / high
-for higher-risk delegate/full implementation, DeepSeek / high when its exact role is
-verified for delegate/full implementation, and Sol / high for audit/full review.
+for higher-risk delegate/full implementation, DeepSeek / max for bounded delegate/full
+implementation when its exact role is verified, and Sol / high for audit/full review.
 If public and local evidence both exist, they must agree. The local inspector is not a
 model-selection fallback.
 

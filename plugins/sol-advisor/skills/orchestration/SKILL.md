@@ -44,7 +44,7 @@ escalation. Details and the task-scoped preflight matrix are in operations.md.
 
 Confirm Sol / High in the primary session. Preflight only an auxiliary selected by the
 declared route: none for solo; Luna / Max, Terra / High, or capability-gated DeepSeek /
-High for delegate; fresh Sol / High for audit; and the selected implementer plus fresh
+Max for delegate; fresh Sol / High for audit; and the selected implementer plus fresh
 Sol reviewer for full. Public metadata for role, model, and effort is authoritative. If
 it omits a model or effort, use the local inspector only for that omitted field. Missing,
 conflicting, unavailable, or unobservable evidence stops the affected lane; never
@@ -53,9 +53,10 @@ silently substitute a role, model, effort, or reviewer.
 ## Route delivery without duplication
 
 - `solo`: root plans, implements, tests, and self-reviews; spawn no auxiliary.
-- `delegate`: select Luna / Max for bounded, fully specified work, Terra / High for
-  judgment-heavy, high-risk, context-heavy, or wide-blast-radius work, or DeepSeek /
-  High only when its exact routed capability is verified. The selected implementer
+- `delegate`: select Luna / Max or capability-gated DeepSeek / Max for bounded, fully
+  specified work, and Terra / High for judgment-heavy, high-risk, context-heavy, or
+  wide-blast-radius work. Select DeepSeek only when its exact routed capability is
+  verified. The selected implementer
   executes the complete spec; root verifies; do not request a fresh review.
 - `audit`: root implements and verifies; a fresh read-only Sol / High reviewer reviews
   the accumulated diff; spawn no implementer.
@@ -70,17 +71,21 @@ be declared and evidenced; do not silently downgrade.
 
 ## Capability-gated DeepSeek implementation
 
-DeepSeek is an optional native implementer for declared `delegate` and `full` routes.
+DeepSeek is an optional native implementer for bounded, fully specified implementation
+work in declared `delegate` and `full` routes. A `full` route may use it only when the
+implementation packet remains bounded within a settled architecture and the broader
+task risk is handled by parent verification plus fresh review.
 The installed `sol_advisor_deepseek_implementer` role pins
-`deepseek/deepseek-v4-flash` at high reasoning, but installation alone is not routing
+`deepseek/deepseek-v4-flash` at max reasoning, but installation alone is not routing
 evidence. Confirm the exact role, model, and effort through public native metadata
 before accepting the lane. An explicit DeepSeek request fails closed when that route
 is unavailable or unobservable.
 
 When the primary selects DeepSeek automatically and the spawn fails before worker work
-begins with a clear provider or surface error, report the failed selection and use
-Terra. Never fall back after DeepSeek has edited files, produced implementation output,
-or returned ambiguous routing metadata. Follow the complete
+begins with a clear provider or surface error, report the failed selection, preflight
+Terra / High, and use Terra only if that check succeeds. Never fall back after DeepSeek
+has edited files, produced implementation output, or returned ambiguous routing
+metadata. Follow the complete
 [DeepSeek native-lane contract](references/deepseek-native-lane.md).
 
 ## Keep architect work in the primary session
