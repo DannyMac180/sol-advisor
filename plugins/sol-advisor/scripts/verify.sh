@@ -473,6 +473,9 @@ done
 grep -Fq 'references/operations.md' "$skill" || fail "skill does not link operations reference"
 grep -Fq 'deepseek-native-lane.md' "$skill" || fail "skill does not link DeepSeek contract"
 grep -Fq 'deepseek-native-lane.md' "$contracts" || fail "role contracts do not link DeepSeek contract"
+for document in "$skill" "$contracts" "$operations"; do
+  grep -Fq 'reported automatic pre-work' "$document" || fail "$document omits the explicit DeepSeek fallback exception"
+done
 grep -Fq 'bounded, fully specified work' "$deepseek_contract" || fail "DeepSeek contract omits bounded-work gate"
 grep -Fq "run Terra's task-scoped preflight" "$deepseek_contract" || fail "DeepSeek fallback omits Terra preflight"
 for document in "$skill" "$contracts" "$deepseek_contract" "$readme"; do

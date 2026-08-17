@@ -44,7 +44,8 @@ agent_type: sol_advisor_sol_reviewer
 fork_turns: none
 ~~~
 
-Do not attach model or reasoning overrides. A missing, conflicting, unavailable, or
+Do not attach model or reasoning overrides. Except for the reported automatic pre-work
+DeepSeek-to-Terra reroute defined below, a missing, conflicting, unavailable, or
 unobservable role/model/effort is a hard stop; never substitute another role.
 
 ## Selective route declaration, preflight, and caching
@@ -116,11 +117,11 @@ later tasks, installation/update, or routing/configuration changes.
 
 Luna / Max is for bounded, fully specified work. Terra / High is selected for
 judgment-heavy, high-risk, context-heavy, or wide-blast-radius work. DeepSeek / Max is
-selected only for bounded, fully specified work when its exact routed capability is verified; an explicit request fails
-closed, while an automatic pre-work routing failure may be reported before selecting
-Terra. A Luna result may justify a declared Terra escalation only when it shows newly
-observed risk. One corrected Luna attempt is reserved for a specification error and is
-not a prerequisite for Terra.
+selected only for bounded, fully specified work when its exact routed capability is
+verified; an explicit request fails closed, while an automatic pre-work routing failure
+may be reported before preflighting and selecting Terra. A Luna result may justify a
+declared Terra escalation only when it shows newly observed risk. One corrected Luna
+attempt is reserved for a specification error and is not a prerequisite for Terra.
 
 If public metadata omits model or effort, use the local inspector below as a fallback
 for those omitted fields only. Do not use it to replace available public evidence.

@@ -35,9 +35,11 @@ routing and reviewer-isolation checks before accepting the result:
    only when its exact routed capability is verified, and Sol / High for audit/full review.
 3. For the reviewer, capture actual sandbox policy and permission profile types.
 
-A missing, stale, unsafe, conflicting, unavailable, inconsistent, or unobservable
-role/model/effort stops the native lane. Never silently fall back. Model and effort
-are pinned by custom-agent TOML, so omit native per-spawn overrides.
+Except for the reported automatic pre-work DeepSeek-to-Terra reroute defined in
+deepseek-native-lane.md, a missing, stale, unsafe, conflicting, unavailable,
+inconsistent, or unobservable role/model/effort stops the native lane. Never silently
+fall back. Model and effort are pinned by custom-agent TOML, so omit native per-spawn
+overrides.
 
 ## Shared implementation contract
 

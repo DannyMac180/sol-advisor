@@ -46,7 +46,8 @@ Confirm Sol / High in the primary session. Preflight only an auxiliary selected 
 declared route: none for solo; Luna / Max, Terra / High, or capability-gated DeepSeek /
 Max for delegate; fresh Sol / High for audit; and the selected implementer plus fresh
 Sol reviewer for full. Public metadata for role, model, and effort is authoritative. If
-it omits a model or effort, use the local inspector only for that omitted field. Missing,
+it omits a model or effort, use the local inspector only for that omitted field. Except
+for the reported automatic pre-work DeepSeek-to-Terra reroute defined below, missing,
 conflicting, unavailable, or unobservable evidence stops the affected lane; never
 silently substitute a role, model, effort, or reviewer.
 
