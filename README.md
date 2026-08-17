@@ -81,3 +81,6 @@ cd /absolute/path/to/sol-advisor
 codex plugin marketplace add /absolute/path/to/sol-advisor
 codex plugin add sol-advisor@sol-advisor
 ~~~
+
+Running `plugins/sol-advisor/scripts/verify.sh` for maintainer verification requires
+Python 3.11+ because it uses the standard-library `tomllib` module.
