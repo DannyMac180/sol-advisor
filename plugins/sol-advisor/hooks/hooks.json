@@ -1,0 +1,17 @@
+{
+  "description": "Add an experimental advisory active-model observation to explicit Sol Advisor execution commands.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$PLUGIN_ROOT/hooks/observe-primary-model.sh\"",
+            "timeout": 5,
+            "statusMessage": "Checking the active model for Sol Advisor"
+          }
+        ]
+      }
+    ]
+  }
+}

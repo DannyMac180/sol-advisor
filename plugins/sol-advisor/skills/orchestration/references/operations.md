@@ -43,6 +43,9 @@ unobservable role/model/effort is a hard stop; never substitute another role.
 The primary session must be Sol / High. Companion installation is separate from task
 routing because plugin installation does not register user-owned TOMLs.
 
+Verify exact `gpt-5.6-sol` / `high` from the active session. `config.toml` alone never
+proves the executing session's model or effort.
+
 At installation or update time, run the repository-relative installer and its exactness
 check:
 
@@ -78,6 +81,15 @@ or high-risk exception. The root may emit a later declaration only to escalate w
 newly observed risk justifies it. It records that evidence and never silently
 downgrades.
 
+A local primary-runtime inspector call also requires this declaration first. If
+complete host primary evidence is unavailable, state in the initial `risk` that model
+evidence is unknown and local inspection is pending.
+
+After explicit model-remediation confirmation, the root may restate the same mode once.
+Use that restatement only to disclose that the primary gate relies on same-thread user
+attestation and whether automated evidence was unavailable or contradictory. Never
+treat this attestation as a global bypass or reuse it in another thread.
+
 The existing --check flag verifies all three roles. For task-scoped preflight, check
 only the auxiliaries selected by the declaration; every check is non-mutating and
 fail-closed:
@@ -111,8 +123,60 @@ for Terra.
 
 If public metadata omits model or effort, use the local inspector below as a fallback
 for those omitted fields only. Do not use it to replace available public evidence.
+This rule applies to auxiliary evidence; primary evidence follows the order below.
 
 ## Runtime routing evidence
+
+### Primary-session evidence
+
+Open the primary gate only with evidence from this order:
+
+1. Use complete host-provided runtime metadata when it explicitly identifies the
+   active model and effort for the current primary session.
+2. If either field is unavailable, inspect the current exact root thread ID.
+3. If automated evidence does not pass, accept explicit user confirmation only after
+   the user completes model remediation in this same thread.
+
+After the route declaration, resolve the helper relative to the installed skill and
+run primary mode:
+
+~~~sh
+skill_dir=<directory-containing-this-SKILL.md>
+runtime_inspector="$skill_dir/../../scripts/inspect-agent-runtime.sh"
+sh "$runtime_inspector" --primary "$CODEX_THREAD_ID"
+~~~
+
+For a disposable fixture or non-default session root:
+
+~~~sh
+sh "$runtime_inspector" --primary --sessions-dir /absolute/path/to/sessions <root-thread-id>
+~~~
+
+Primary mode matches one exact rollout suffix and requires a root session. It does not
+require auxiliary-only `agent_role` or `agent_path` metadata. It reads only the latest
+`turn_context`, so an in-thread `/model` change supersedes older turns. On success, it
+emits only the allowlisted thread ID, model, effort, provider, and working directory.
+It accepts exact `gpt-5.6-sol` / `high` only. Zero or multiple files, child metadata,
+missing or malformed fields, and mismatches fail closed. The inspector does not expose
+prompts, messages, transcript content, environment variables, tokens, configuration,
+or arbitrary rollout payloads.
+
+If automated evidence is unavailable or mismatched:
+
+1. Tell the user to select Sol / High with `/model`.
+2. Tell the user to verify the change with `/status`.
+3. Offer `$sol-advisor:configure-model-hook`.
+4. Stop for explicit confirmation.
+
+If the user declines, do not run Sol Advisor. For the current thread only, confirmation
+may override unavailable or contradictory evidence. Disclose that basis in the
+restated route risk and keep the attestation in conversation state only. Never create
+a file, config flag, global cache, or cross-session bypass.
+
+Codex documents `/model` and `/status` in its
+[developer command reference](https://learn.chatgpt.com/docs/developer-commands?surface=cli).
+
+### Auxiliary routing evidence
 
 The public spawn/details record is authoritative for the selected role and any exposed
 model/effort. When model or effort is omitted, resolve the helper relative to the
@@ -140,6 +204,54 @@ Accepted routing is Luna / max for bounded delegate/full implementation, Terra /
 for higher-risk delegate/full implementation, and Sol / high for audit/full review.
 If public and local evidence both exist, they must agree. The local inspector is not a
 model-selection fallback.
+
+## Experimental advisory model hook
+
+The optional `UserPromptSubmit` hook adds active-model context to explicit Sol Advisor
+execution prompts. It is experimental and advisory. Codex does not trust a plugin hook
+merely because the plugin is installed or enabled. Use `/hooks` to review its exact
+definition, trust it, disable it, or re-enable it. Review a changed hook definition
+again. See the official [Codex hooks documentation](https://learn.chatgpt.com/docs/hooks).
+
+Codex currently ignores `UserPromptSubmit` matchers, so the script enforces its own
+allowlist. It runs only when the submitted prompt explicitly invokes an approved
+AI-execution command, initially `$sol-advisor:orchestration`. It emits no output for
+`$sol-advisor:configure-model-hook`, unrelated prompts, or malformed input. For an
+allowlisted prompt, it injects a concise active-model observation or mismatch warning.
+It never blocks a prompt, changes a model, authorizes orchestration, reads the
+transcript, or supplies reasoning-effort proof. The stable common hook input exposes
+the active model but not effort. The primary runtime inspector remains the automatic
+authority for both fields.
+
+The optional `$sol-advisor:configure-model-hook` skill inspects the runtime and the two
+relevant user-default keys before it suggests a change. It asks separately for approval
+before editing user-level `model = "gpt-5.6-sol"` and
+`model_reasoning_effort = "high"`. It preserves unrelated configuration and stops for
+manual handling when a safe minimal edit is ambiguous. Defaults affect future threads;
+the executing TUI still requires `/model`.
+
+Use these supported automation paths to avoid user-default edits when appropriate:
+
+~~~sh
+codex --model gpt-5.6-sol -c 'model_reasoning_effort="high"'
+~~~
+
+App Server callers can set per-turn overrides in `turn/start`:
+
+~~~json
+{
+  "method": "turn/start",
+  "params": {
+    "threadId": "<thread-id>",
+    "input": [{"type": "text", "text": "$sol-advisor:orchestration Build this."}],
+    "model": "gpt-5.6-sol",
+    "effort": "high"
+  }
+}
+~~~
+
+See the official [App Server documentation](https://learn.chatgpt.com/docs/app-server)
+for these `turn/start` overrides.
 
 ## Read-only reviewer interpretation
 
@@ -188,6 +300,7 @@ git status --short
 git diff --stat
 ~~~
 
-The verifier covers the v0.6.0 manifest, exact three-role TOMLs, selective-routing
+The verifier covers the v0.6.1 manifest, exact three-role TOMLs, selective-routing
 contracts, concise README journey, absence of retired workflow references, installer
 safety fixtures, Luna runtime evidence, JSON/TOML validity, and shell syntax.
+It also checks the primary-runtime and advisory-hook contracts and fixtures.
