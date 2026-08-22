@@ -19,9 +19,39 @@ preflight, runtime-evidence, isolation, and maintainer procedures.
 
 Run the primary Codex session on gpt-5.6-sol with high reasoning. Verify the current
 model and effort when runtime metadata exposes them. If either differs, tell the user
-to select Sol / High and stop before delegation. If runtime metadata does not expose
-them, ask the user to confirm Sol / High and stop until confirmed. A skill cannot
+to select Sol / High and stop before delegation. If host-provided runtime metadata
+does not expose both fields, follow the evidence order below before asking for
+confirmation. A skill cannot
 change the primary model itself; never assume or claim this prerequisite is satisfied.
+
+Resolve evidence in this order:
+
+1. Use complete host-provided runtime metadata when it explicitly identifies the
+   active model and reasoning effort for this primary session.
+2. If either field is unavailable, emit the route declaration below, then pass the
+   current exact root thread ID to `../../scripts/inspect-agent-runtime.sh --primary`.
+3. If automated evidence does not pass, accept explicit user confirmation only after
+   the user completes the requested remediation in this same thread.
+
+Never use `config.toml`, configured defaults, a bundled hook observation, auxiliary
+metadata, or a previous thread as active-session proof.
+
+When automated evidence reports exact Sol / High, continue without prompting. If
+evidence is unavailable, malformed, ambiguous, or mismatched:
+
+1. Show `/model` and ask the user to select Sol with high reasoning.
+2. Show `/status` as the verification step.
+3. Offer the experimental `$sol-advisor:configure-model-hook` command.
+4. Stop until the user explicitly confirms completion.
+
+A skill or hook cannot change the turn already in progress. For this thread only,
+explicit remediation confirmation may override unavailable or contradictory automated
+evidence. Before resuming task tools, restate the same route. In `risk`, disclose that
+primary Sol / High relies on same-thread user attestation and say whether automated
+evidence was unavailable or contradictory. Store the attestation only in conversation
+state for this thread. Never write a global flag, configuration bypass, file, cache,
+or cross-session exception. Without confirmation, or after refusal, do not run Sol
+Advisor.
 
 ## Declare the route before task tools
 
@@ -37,6 +67,10 @@ No task tool call may precede this declaration. Choose `solo` unless a stated ri
 justifies another mode. A later declaration may only escalate the route when newly
 observed risk justifies it; never silently downgrade. Record the evidence for an
 escalation. Details and the task-scoped preflight matrix are in operations.md.
+
+No local primary-runtime inspector call may precede this declaration. If complete
+host evidence is unavailable, state in `risk` that model evidence is unknown and
+inspection is pending.
 
 ## Preflight selected auxiliaries only
 

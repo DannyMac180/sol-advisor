@@ -1,16 +1,19 @@
 #!/bin/sh
-# Emit only allowlisted routing metadata from one exact native subagent rollout.
+# Emit only allowlisted routing metadata from one exact native rollout.
 
 set -eu
 
 usage() {
   cat <<'EOF'
-Usage: inspect-agent-runtime.sh [--sessions-dir DIR] THREAD_ID
+Usage: inspect-agent-runtime.sh [--primary] [--sessions-dir DIR] THREAD_ID
 
 Read the one rollout file whose filename ends with THREAD_ID and emit a compact JSON
 object containing only safe routing metadata. Without --sessions-dir, the sessions
 root is "$CODEX_HOME/sessions" when CODEX_HOME is already set, otherwise
 "$HOME/.codex/sessions".
+
+With --primary, inspect a root thread, use its latest turn context, and accept only
+gpt-5.6-sol with high effort.
 EOF
 }
 
@@ -20,9 +23,18 @@ fail() {
 }
 
 sessions_dir=''
+primary=false
 case "$#" in
   1)
     thread_id=$1
+    ;;
+  2)
+    [ "$1" = "--primary" ] || {
+      usage >&2
+      exit 2
+    }
+    primary=true
+    thread_id=$2
     ;;
   3)
     [ "$1" = "--sessions-dir" ] || {
@@ -32,6 +44,16 @@ case "$#" in
     [ -n "$2" ] || fail "--sessions-dir requires a non-empty directory."
     sessions_dir=$2
     thread_id=$3
+    ;;
+  4)
+    [ "$1" = "--primary" ] && [ "$2" = "--sessions-dir" ] || {
+      usage >&2
+      exit 2
+    }
+    [ -n "$3" ] || fail "--sessions-dir requires a non-empty directory."
+    primary=true
+    sessions_dir=$3
+    thread_id=$4
     ;;
   *)
     usage >&2
@@ -93,6 +115,66 @@ esac
 
 IFS= read -r rollout_file < "$matches_file" || fail "could not read the matched rollout filename."
 [ -f "$rollout_file" ] || fail "matched rollout is unavailable."
+
+# Primary rollouts omit auxiliary-only role metadata. Read the latest turn so an
+# in-thread /model change takes effect. Reduce the value to five allowlisted fields
+# before the shell can print it.
+if [ "$primary" = true ]; then
+  if ! primary_output=$(jq -ce -s --arg expected_thread_id "$thread_id" '
+    def string_or_null:
+      if type == "string" then . else null end;
+
+    [ .[] | select(.type == "session_meta") | .payload ] as $sessions |
+    [ .[] | select(.type == "turn_context") | .payload ] as $turns |
+    if ($sessions | length) != 1 then
+      error("missing or ambiguous session metadata")
+    elif ($turns | length) == 0 then
+      error("missing turn context")
+    else
+      $sessions[0] as $session |
+      $turns[-1] as $latest |
+      ($session.id? | string_or_null) as $session_thread_id |
+      ($session.parent_thread_id? // null) as $parent_thread_id |
+      ($latest.model? | string_or_null) as $model |
+      ($latest.effort? | string_or_null) as $effort |
+      (($latest.model_provider? // $session.model_provider?) | string_or_null) as $model_provider |
+      ($latest.cwd? | string_or_null) as $cwd |
+      if $session_thread_id == null or $session_thread_id != $expected_thread_id then
+        error("session metadata does not identify the requested thread")
+      elif $parent_thread_id != null then
+        error("session metadata identifies a child thread")
+      elif $model == null or $model == "" then
+        error("missing model")
+      elif $effort == null or $effort == "" then
+        error("missing effort")
+      elif $model_provider == null or $model_provider == "" then
+        error("missing model provider")
+      elif $cwd == null or $cwd == "" then
+        error("missing working directory")
+      else
+        {
+          thread_id: $session_thread_id,
+          model: $model,
+          effort: $effort,
+          model_provider: $model_provider,
+          cwd: $cwd
+        }
+      end
+    end
+  ' "$rollout_file" 2>/dev/null); then
+    fail "primary rollout metadata is missing, ambiguous, invalid, or incomplete."
+  fi
+
+  primary_model=$(printf '%s\n' "$primary_output" | jq -r '.model')
+  primary_effort=$(printf '%s\n' "$primary_output" | jq -r '.effort')
+  if [ "$primary_model" != gpt-5.6-sol ] || [ "$primary_effort" != high ]; then
+    printf '%s\n' \
+      "ERROR: primary runtime mismatch: expected model=gpt-5.6-sol effort=high; observed evidence=$primary_output" >&2
+    exit 1
+  fi
+  printf '%s\n' "$primary_output"
+  exit 0
+fi
 
 # The jq program reads only the matched JSONL and constructs a new allowlisted object.
 # It rejects absent or conflicting required routing values instead of inferring them.

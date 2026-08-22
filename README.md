@@ -62,6 +62,24 @@ for root work; it does not duplicate it. The root inspects the complete diff and
 reruns the requested checks. When the selected route includes a review, a fresh Sol /
 High reviewer returns ship, fix-first, or rethink; any fix requires a new review.
 
+Sol Advisor starts work only after it verifies the active primary session as exact
+`gpt-5.6-sol` / `high`. It reads the latest turn, so a same-thread `/model` change
+applies. Configured defaults alone never prove which model or effort the session uses.
+If evidence is unavailable or mismatched, use `/model` to select Sol / High, use
+`/status` to verify it, and confirm the change. That confirmation applies only to the
+current thread. See the official [Codex developer commands](https://learn.chatgpt.com/docs/developer-commands?surface=cli).
+
+## Optional experimental model hook
+
+The optional hook adds an active-model warning to explicit Sol Advisor execution
+prompts. Run `$sol-advisor:configure-model-hook` to inspect the current runtime and
+relevant defaults. The command asks for separate approval before it changes defaults
+for future threads. It cannot change the current session; use `/model` for that.
+Use `/hooks` to review, trust, disable, or re-enable the bundled hook. The hook is
+experimental and advisory: it never blocks a prompt, changes a model, proves reasoning
+effort, or authorizes orchestration. See the official
+[Codex hooks documentation](https://learn.chatgpt.com/docs/hooks).
+
 ## Updating
 
 Update the marketplace plugin, reinstall the companion roles, and start a new task:

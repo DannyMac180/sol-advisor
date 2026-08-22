@@ -1,0 +1,4 @@
+interface:
+  display_name: "Configure Sol Advisor Model Hook"
+  short_description: "Check Sol / High evidence and optionally set future-thread defaults"
+  default_prompt: "Use $configure-model-hook to inspect the current runtime and defaults, explain the experimental advisory hook, and ask separately for approval before any config edit."

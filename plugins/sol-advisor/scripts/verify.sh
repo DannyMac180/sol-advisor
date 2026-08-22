@@ -11,13 +11,17 @@ plugin_dir=$(CDPATH= cd "$script_dir/.." && pwd) || exit 1
 repo_dir=$(CDPATH= cd "$plugin_dir/../.." && pwd) || exit 1
 installer=$script_dir/install-agents.sh
 runtime_inspector=$script_dir/inspect-agent-runtime.sh
+model_hook=$plugin_dir/hooks/observe-primary-model.sh
+hooks_config=$plugin_dir/hooks/hooks.json
 templates=$plugin_dir/agents
 manifest=$plugin_dir/.codex-plugin/plugin.json
 skill=$plugin_dir/skills/orchestration/SKILL.md
+configure_skill=$plugin_dir/skills/configure-model-hook/SKILL.md
 contracts=$plugin_dir/skills/orchestration/references/role-contracts.md
 operations=$plugin_dir/skills/orchestration/references/operations.md
 readme=$repo_dir/README.md
 ui=$plugin_dir/skills/orchestration/agents/openai.yaml
+configure_ui=$plugin_dir/skills/configure-model-hook/agents/openai.yaml
 retired_contract=$plugin_dir/skills/orchestration/references/luna-task-lane.md
 
 tmp_base=/tmp
@@ -156,21 +160,24 @@ V050_TERRA
   [ "$(shasum -a 256 "$target/$terra_file" | awk '{print $1}')" = "$legacy_terra_v050_sha256" ] || fail "v0.5.0 Terra fixture digest drifted"
 }
 
-for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contracts" "$operations" "$readme" "$ui"; do
+for required in "$installer" "$runtime_inspector" "$model_hook" "$hooks_config" "$manifest" "$skill" "$configure_skill" "$contracts" "$operations" "$readme" "$ui" "$configure_ui"; do
   test -f "$required" || fail "required file missing: $required"
 done
 test ! -e "$retired_contract" || fail "retired separate workflow contract remains: $retired_contract"
 pass "required files present and retired contract absent"
 
 jq empty "$manifest"
-[ "$(jq -r '.version' "$manifest")" = 0.6.0 ] || fail "manifest version is not 0.6.0"
+jq empty "$hooks_config"
+[ "$(jq -r '.version' "$manifest")" = 0.6.1 ] || fail "manifest version is not 0.6.1"
+grep -Fq 'UserPromptSubmit' "$hooks_config" || fail "hook config omits UserPromptSubmit"
+grep -Fq 'observe-primary-model.sh' "$hooks_config" || fail "hook config omits model observer"
 grep -Fq 'SELECTIVE ROUTE' "$manifest" || fail "manifest omits route declaration"
 grep -Fq 'solo is the default' "$manifest" || fail "manifest omits solo default"
 grep -Fq 'delegate uses native GPT-5.6 Luna / Max' "$manifest" || fail "manifest omits delegate role contract"
 grep -Fq 'audit uses a fresh read-only GPT-5.6 Sol / High review' "$manifest" || fail "manifest omits audit contract"
 grep -Fq 'full combines one selected implementer' "$manifest" || fail "manifest omits exceptional full contract"
 grep -Fq 'fails closed' "$manifest" || fail "manifest omits fail-closed evidence rule"
-pass "manifest JSON, v0.6.0 release, and selective-routing language"
+pass "manifest and hook JSON, v0.6.1 release, and selective-routing language"
 
 python3 - "$templates" <<'PY'
 from pathlib import Path
@@ -367,6 +374,9 @@ pass "unsafe destination refusal with zero partial mutation"
 runtime_sessions=$tmp_dir/runtime-sessions
 runtime_day=$runtime_sessions/2026/08/15
 mkdir -p "$runtime_day"
+
+# These fixtures preserve the auxiliary contract: require role metadata and reject
+# conflicting history.
 runtime_id=11111111-1111-7111-8111-111111111111
 runtime_rollout=$runtime_day/rollout-2026-08-15T00-00-00-$runtime_id.jsonl
 printf '%s\n' \
@@ -387,6 +397,149 @@ zero_id=22222222-2222-7222-8222-222222222222
 if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$zero_id" >/dev/null 2>&1; then fail "runtime inspector accepted zero matches"; fi
 pass "runtime inspector Luna/Max routing and safe refusal"
 
+aux_root_id=11111111-1111-7111-8111-111111111112
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$aux_root_id\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
+  > "$runtime_day/rollout-2026-08-15T00-00-01-$aux_root_id.jsonl"
+if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$aux_root_id" >/dev/null 2>&1; then
+  fail "auxiliary inspector accepted missing agent role"
+fi
+aux_conflict_id=11111111-1111-7111-8111-111111111113
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$aux_conflict_id\",\"agent_role\":\"sol_advisor_luna_implementer\",\"model_provider\":\"openai\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-terra","effort":"max","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
+  > "$runtime_day/rollout-2026-08-15T00-00-02-$aux_conflict_id.jsonl"
+if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$aux_conflict_id" >/dev/null 2>&1; then
+  fail "auxiliary inspector accepted conflicting models"
+fi
+pass "auxiliary inspector still requires role metadata and rejects conflicting history"
+
+# Verify that primary mode accepts root sessions without auxiliary-only role metadata
+# and uses only the latest turn context.
+primary_sessions=$tmp_dir/primary-runtime-sessions
+primary_day=$primary_sessions/2026/08/16
+mkdir -p "$primary_day"
+primary_id=33333333-3333-7333-8333-333333333333
+primary_rollout=$primary_day/rollout-2026-08-16T00-00-00-$primary_id.jsonl
+printf '%s\n' \
+  '{"type":"response_item","payload":{"prompt":"PRIMARY_PROMPT_MUST_NOT_LEAK","transcript":"TRANSCRIPT_MUST_NOT_LEAK"}}' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_id\",\"model_provider\":\"openai\",\"cwd\":\"/old-cwd\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-terra","effort":"medium","cwd":"/old-cwd"}}' \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","cwd":"/current-cwd"}}' \
+  > "$primary_rollout"
+primary_output=$(sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_id")
+printf '%s\n' "$primary_output" | jq -e --arg id "$primary_id" '
+  keys == ["cwd", "effort", "model", "model_provider", "thread_id"]
+  and .thread_id == $id and .model == "gpt-5.6-sol" and .effort == "high"
+  and .model_provider == "openai" and .cwd == "/current-cwd"
+' >/dev/null || fail "primary inspector returned wrong latest-turn evidence"
+if printf '%s\n' "$primary_output" | grep -Eq 'PRIMARY_PROMPT|TRANSCRIPT|old-cwd|agent_role|agent_path'; then
+  fail "primary inspector leaked non-allowlisted or historical payload"
+fi
+
+# Verify that the latest mismatch wins and the diagnostic exposes only exact,
+# allowlisted evidence.
+primary_mismatch_id=44444444-4444-7444-8444-444444444444
+primary_mismatch_rollout=$primary_day/rollout-2026-08-16T00-00-01-$primary_mismatch_id.jsonl
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_mismatch_id\",\"model_provider\":\"openai\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","cwd":"/fixture"}}' \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-terra","effort":"medium","cwd":"/fixture"}}' \
+  > "$primary_mismatch_rollout"
+mismatch_error=$tmp_dir/primary-mismatch.err
+if sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_mismatch_id" > /dev/null 2> "$mismatch_error"; then
+  fail "primary inspector accepted a latest-turn mismatch"
+fi
+grep -Fq 'expected model=gpt-5.6-sol effort=high' "$mismatch_error" || fail "primary mismatch omits exact expectation"
+grep -Fq '"model":"gpt-5.6-terra"' "$mismatch_error" || fail "primary mismatch omits observed model"
+grep -Fq '"effort":"medium"' "$mismatch_error" || fail "primary mismatch omits observed effort"
+
+primary_missing_id=55555555-5555-7555-8555-555555555555
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_missing_id\",\"model_provider\":\"openai\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","cwd":"/fixture"}}' \
+  > "$primary_day/rollout-2026-08-16T00-00-02-$primary_missing_id.jsonl"
+if sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_missing_id" >/dev/null 2>&1; then
+  fail "primary inspector accepted missing effort"
+fi
+
+primary_malformed_id=66666666-6666-7666-8666-666666666666
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_malformed_id\",\"model_provider\":\"openai\"}}" \
+  '{malformed-json' \
+  > "$primary_day/rollout-2026-08-16T00-00-03-$primary_malformed_id.jsonl"
+if sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_malformed_id" >/dev/null 2>&1; then
+  fail "primary inspector accepted malformed JSONL"
+fi
+
+primary_child_id=77777777-7777-7777-8777-777777777777
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_child_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"model_provider\":\"openai\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","cwd":"/fixture"}}' \
+  > "$primary_day/rollout-2026-08-16T00-00-04-$primary_child_id.jsonl"
+if sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_child_id" >/dev/null 2>&1; then
+  fail "primary inspector accepted child-thread metadata"
+fi
+
+primary_ambiguous_id=88888888-8888-7888-8888-888888888888
+mkdir -p "$primary_sessions/2026/08/17" "$primary_sessions/2026/08/18"
+for fixture_day in 17 18; do
+  printf '%s\n' \
+    "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_ambiguous_id\",\"model_provider\":\"openai\"}}" \
+    '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","cwd":"/fixture"}}' \
+    > "$primary_sessions/2026/08/$fixture_day/rollout-2026-08-${fixture_day}T00-00-00-$primary_ambiguous_id.jsonl"
+done
+if sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_ambiguous_id" >/dev/null 2>&1; then
+  fail "primary inspector accepted ambiguous rollout matches"
+fi
+primary_unmatched_id=99999999-9999-7999-8999-999999999999
+if sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_unmatched_id" >/dev/null 2>&1; then
+  fail "primary inspector accepted an unmatched thread id"
+fi
+primary_duplicate_meta_id=aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_duplicate_meta_id\",\"model_provider\":\"openai\"}}" \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_duplicate_meta_id\",\"model_provider\":\"openai\"}}" \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","cwd":"/fixture"}}' \
+  > "$primary_day/rollout-2026-08-16T00-00-05-$primary_duplicate_meta_id.jsonl"
+if sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_duplicate_meta_id" >/dev/null 2>&1; then
+  fail "primary inspector accepted ambiguous session metadata"
+fi
+primary_unmatched_meta_id=bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb
+printf '%s\n' \
+  '{"type":"session_meta","payload":{"id":"cccccccc-cccc-7ccc-8ccc-cccccccccccc","model_provider":"openai"}}' \
+  '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","cwd":"/fixture"}}' \
+  > "$primary_day/rollout-2026-08-16T00-00-06-$primary_unmatched_meta_id.jsonl"
+if sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_unmatched_meta_id" >/dev/null 2>&1; then
+  fail "primary inspector accepted unmatched session metadata"
+fi
+pass "primary inspector uses the latest turn, reports exact mismatches, and fails closed"
+
+hook_sol=$(printf '%s\n' '{"hook_event_name":"UserPromptSubmit","prompt":"Use $sol-advisor:orchestration to build this.","model":"gpt-5.6-sol"}' | sh "$model_hook")
+printf '%s\n' "$hook_sol" | grep -Fq 'active model is gpt-5.6-sol' || fail "hook omitted Sol observation"
+printf '%s\n' "$hook_sol" | grep -Fq 'evidence covers the model only' || fail "hook does not limit its evidence claim to the model"
+
+hook_mismatch=$(printf '%s\n' '{"hook_event_name":"UserPromptSubmit","prompt":"Use $sol-advisor:orchestration to build this.","model":"gpt-5.6-terra"}' | sh "$model_hook")
+printf '%s\n' "$hook_mismatch" | grep -Fq 'active model is gpt-5.6-terra, but Sol Advisor requires gpt-5.6-sol' || fail "hook omitted the exact mismatch warning"
+
+hook_unrelated=$(printf '%s\n' '{"hook_event_name":"UserPromptSubmit","prompt":"Explain selective routing.","model":"gpt-5.6-terra"}' | sh "$model_hook")
+[ -z "$hook_unrelated" ] || fail "hook emitted output for unrelated prompt"
+hook_configure=$(printf '%s\n' '{"hook_event_name":"UserPromptSubmit","prompt":"Use $sol-advisor:configure-model-hook now.","model":"gpt-5.6-terra"}' | sh "$model_hook")
+[ -z "$hook_configure" ] || fail "hook emitted output for configuration command"
+hook_malformed=$(printf '%s\n' '{malformed-json' | sh "$model_hook")
+[ -z "$hook_malformed" ] || fail "hook emitted output for malformed input"
+hook_missing=$(printf '%s\n' '{"hook_event_name":"UserPromptSubmit","prompt":"Use $sol-advisor:orchestration now."}' | sh "$model_hook")
+[ -z "$hook_missing" ] || fail "hook emitted output without active-model evidence"
+
+for hook_output in "$hook_sol" "$hook_mismatch"; do
+  if printf '%s\n' "$hook_output" | grep -Eqi 'effort[=:][[:space:]]*high|reasoning effort is high|"decision"[[:space:]]*:[[:space:]]*"block"'; then
+    fail "hook claimed reasoning effort or blocked orchestration"
+  fi
+done
+pass "advisory hook observes allowlisted prompts and ignores unrelated or malformed input"
+
 for document in "$contracts" "$operations"; do
   grep -Fq 'agent_type: sol_advisor_luna_implementer' "$document" || fail "missing Luna spawn in $document"
   grep -Fq 'agent_type: sol_advisor_terra_implementer' "$document" || fail "missing Terra spawn in $document"
@@ -398,6 +551,17 @@ done
 grep -Fq 'references/operations.md' "$skill" || fail "skill does not link operations reference"
 grep -Fq '../../scripts/install-agents.sh' "$operations" || fail "operations does not resolve installer relatively"
 grep -Fq '../../scripts/inspect-agent-runtime.sh' "$operations" || fail "operations does not resolve inspector relatively"
+grep -Fq 'inspect-agent-runtime.sh --primary' "$skill" || fail "skill does not invoke primary runtime mode"
+grep -Fq 'No local primary-runtime inspector call may precede' "$skill" || fail "skill does not route before primary inspection"
+grep -Fq 'complete host-provided runtime metadata' "$skill" || fail "skill omits host-first primary evidence"
+grep -Fq 'explicit user confirmation' "$skill" || fail "skill omits explicit confirmation fallback"
+grep -Fqi 'show `/model`' "$skill" || fail "skill omits the model-remediation command"
+grep -Fqi 'show `/status`' "$skill" || fail "skill omits the status-verification command"
+grep -Fq '$sol-advisor:configure-model-hook' "$skill" || fail "skill omits experimental hook offer"
+grep -Fq 'may override unavailable or contradictory' "$skill" || fail "skill omits same-thread confirmation override"
+grep -Fq 'state for this thread' "$skill" || fail "skill omits the thread-local attestation cache"
+grep -Fq 'Never write a' "$skill" || fail "skill omits global-bypass prohibition"
+grep -Fq 'Never use `config.toml`' "$skill" || fail "skill permits config-only active proof"
 grep -Fq 'SELECTIVE ROUTE' "$skill" || fail "skill omits route declaration"
 grep -Fq 'mode: solo | delegate | audit | full' "$skill" || fail "skill omits exact route modes"
 grep -Fq 'No task tool call may precede this declaration' "$skill" || fail "skill permits tool-before-route"
@@ -427,6 +591,24 @@ if grep -Fqi 'commitment-boundary sol consult' "$contracts"; then fail "contract
 pass "native role contracts, selective route declaration, escalation, and correction checks"
 
 for phrase in \
+  'Experimental and advisory' \
+  'Inspect before suggesting changes' \
+  'Never use `config.toml`' \
+  'ask separately for explicit approval' \
+  'preserve every unrelated byte' \
+  'stop and give manual instructions' \
+  'future threads' \
+  '/model' \
+  '/hooks' \
+  'never blocks' \
+  'reasoning-effort proof' \
+  'codex --model gpt-5.6-sol' \
+  'turn/start'; do
+  grep -Fqi "$phrase" "$configure_skill" || fail "configuration skill omits: $phrase"
+done
+pass "experimental configuration skill inspection, approval, safety, and automation contracts"
+
+for phrase in \
   'agent_type: sol_advisor_luna_implementer' \
   'agent_type: sol_advisor_terra_implementer' \
   'agent_type: sol_advisor_sol_reviewer' \
@@ -437,6 +619,15 @@ for phrase in \
   'one auxiliary is the default maximum' \
   'only to escalate when' \
   'local inspector' \
+  'Primary-session evidence' \
+  'complete host-provided runtime metadata' \
+  'explicit user confirmation' \
+  'conversation state only' \
+  'config.toml` alone never' \
+  'Experimental advisory model hook' \
+  'UserPromptSubmit' \
+  '/hooks' \
+  'turn/start' \
   'sandbox_mode = read-only' \
   'install-agents.sh --check'; do
   grep -Fqi "$phrase" "$operations" || fail "operations reference omits: $phrase"
@@ -466,6 +657,13 @@ grep -Fq 'newly observed' "$readme" || fail "README omits escalation gate"
 grep -Fq 'never silently downgrades' "$readme" || fail "README permits silent downgrade"
 grep -Fq 'need to select or manage a lane' "$readme" || fail "README asks users to manage lanes"
 grep -Fq 'Luna / Max or Terra / High access is needed only when' "$readme" || fail "README omits conditional delegate access"
+grep -Fq 'latest turn' "$readme" || fail "README omits latest-turn primary evidence"
+grep -Fq 'Configured defaults alone never prove' "$readme" || fail "README permits config-only proof"
+grep -Fq '`/model`' "$readme" || fail "README omits in-session model remediation"
+grep -Fq '`/status`' "$readme" || fail "README omits in-session status verification"
+grep -Fq '$sol-advisor:configure-model-hook' "$readme" || fail "README omits optional configuration command"
+grep -Fq '`/hooks`' "$readme" || fail "README omits hook trust browser"
+grep -Fq 'never blocks a prompt, changes a model, proves reasoning' "$readme" || fail "README overstates the advisory hook"
 python3 - "$readme" <<'PY'
 from pathlib import Path
 import sys
@@ -489,7 +687,7 @@ print("two companion install examples are fail-closed and guarded")
 PY
 pass "README is concise, user-first, route-tabled, and keeps maintainer machinery out"
 
-python3 - "$readme" "$manifest" "$skill" "$contracts" "$operations" "$ui" "$templates" <<'PY'
+python3 - "$readme" "$manifest" "$skill" "$configure_skill" "$contracts" "$operations" "$ui" "$configure_ui" "$hooks_config" "$model_hook" "$templates" <<'PY'
 from pathlib import Path
 import sys
 
@@ -533,7 +731,7 @@ grep -Fq 'https://attentionheads.substack.com/?utm_source=github&utm_medium=read
 grep -Fq 'https://attentionheads.substack.com/subscribe?utm_source=github&utm_medium=readme&utm_campaign=sol-advisor' "$readme" || fail "README changed Subscribe link"
 pass "README selective routing and preserved Go deeper links"
 
-for document in "$readme" "$manifest" "$skill" "$contracts" "$ui"; do
+for document in "$readme" "$manifest" "$skill" "$configure_skill" "$contracts" "$ui" "$configure_ui"; do
   if grep -Eqi 'Terra / High is the sole implementation producer|one role-pinned .*handles all implementation|route all implementation through.*Terra|delegate all implementation to (the )?(native )?Terra' "$document"; then
     fail "stale single-mode implementation claim remains in $document"
   fi
@@ -545,7 +743,8 @@ pass "obsolete single-lane claims and second Terra role absent"
 
 sh -n "$installer"
 sh -n "$runtime_inspector"
+sh -n "$model_hook"
 sh -n "$script_dir/verify.sh"
 pass "shell syntax"
 
-printf '%s\n' "VERIFY PASSED: Sol Advisor v0.6.0 selective routing checks completed in $tmp_dir"
+printf '%s\n' "VERIFY PASSED: Sol Advisor v0.6.1 primary-runtime and advisory-hook checks passed in $tmp_dir"
