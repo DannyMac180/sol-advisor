@@ -126,6 +126,12 @@ if ! jq -ce -s --arg expected_thread_id "$thread_id" '
       error("missing model")
     elif any($efforts[]; . == null or . == "") then
       error("missing effort")
+    elif any($sandbox_types[]; . == null or . == "") then
+      error("missing sandbox policy type")
+    elif any($permission_types[]; . == null or . == "") then
+      error("missing permission profile type")
+    elif any($cwds[]; . == null or . == "") then
+      error("missing working directory")
     elif ($models | unique | length) != 1 then
       error("conflicting models")
     elif ($efforts | unique | length) != 1 then

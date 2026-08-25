@@ -387,6 +387,40 @@ zero_id=22222222-2222-7222-8222-222222222222
 if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$zero_id" >/dev/null 2>&1; then fail "runtime inspector accepted zero matches"; fi
 pass "runtime inspector Luna/Max routing and safe refusal"
 
+reviewer_id=33333333-3333-7333-8333-333333333333
+reviewer_rollout=$runtime_day/rollout-2026-08-15T00-00-01-$reviewer_id.jsonl
+reviewer_session="{\"type\":\"session_meta\",\"payload\":{\"id\":\"$reviewer_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"agent_role\":\"sol_advisor_sol_reviewer\",\"agent_path\":\"/root/reviewer-fixture\",\"model_provider\":\"openai\",\"cwd\":\"/reviewer-fixture\"}}"
+
+write_reviewer_turn() {
+  printf '%s\n' "$reviewer_session" "$1" > "$reviewer_rollout"
+}
+
+expect_reviewer_refusal() {
+  label=$1
+  write_reviewer_turn "$2"
+  if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$reviewer_id" >/dev/null 2>&1; then
+    fail "runtime inspector accepted reviewer with $label"
+  fi
+}
+
+write_reviewer_turn '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","sandbox_policy":{"type":"read-only"},"permission_profile":{"type":"managed"},"cwd":"/reviewer-fixture"}}'
+reviewer_output=$(sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$reviewer_id")
+printf '%s\n' "$reviewer_output" | jq -e --arg id "$reviewer_id" '
+  .thread_id == $id and .agent_role == "sol_advisor_sol_reviewer"
+  and .model == "gpt-5.6-sol" and .effort == "high"
+  and .sandbox_policy_type == "read-only"
+  and .permission_profile_type == "managed"
+  and .cwd == "/reviewer-fixture"
+' >/dev/null || fail "runtime inspector returned wrong reviewer evidence"
+
+expect_reviewer_refusal "missing sandbox policy type" '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","permission_profile":{"type":"managed"},"cwd":"/reviewer-fixture"}}'
+expect_reviewer_refusal "empty sandbox policy type" '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","sandbox_policy":{"type":""},"permission_profile":{"type":"managed"},"cwd":"/reviewer-fixture"}}'
+expect_reviewer_refusal "missing permission profile type" '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","sandbox_policy":{"type":"read-only"},"cwd":"/reviewer-fixture"}}'
+expect_reviewer_refusal "empty permission profile type" '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","sandbox_policy":{"type":"read-only"},"permission_profile":{"type":""},"cwd":"/reviewer-fixture"}}'
+expect_reviewer_refusal "missing working directory" '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","sandbox_policy":{"type":"read-only"},"permission_profile":{"type":"managed"}}}'
+expect_reviewer_refusal "empty working directory" '{"type":"turn_context","payload":{"model":"gpt-5.6-sol","effort":"high","sandbox_policy":{"type":"read-only"},"permission_profile":{"type":"managed"},"cwd":""}}'
+pass "runtime inspector reviewer evidence and fail-closed missing or empty values"
+
 for document in "$contracts" "$operations"; do
   grep -Fq 'agent_type: sol_advisor_luna_implementer' "$document" || fail "missing Luna spawn in $document"
   grep -Fq 'agent_type: sol_advisor_terra_implementer' "$document" || fail "missing Terra spawn in $document"
