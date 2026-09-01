@@ -15,13 +15,27 @@ Read [references/role-contracts.md](references/role-contracts.md) before the fir
 delegation. Use [references/operations.md](references/operations.md) for exact spawn,
 preflight, runtime-evidence, isolation, and maintainer procedures.
 
-## Confirm the primary session
+## Verify the primary session
 
-Run the primary Codex session on gpt-5.6-sol with high reasoning. Verify the current
-model and effort when runtime metadata exposes them. If either differs, tell the user
-to select Sol / High and stop before delegation. If runtime metadata does not expose
-them, ask the user to confirm Sol / High and stop until confirmed. A skill cannot
-change the primary model itself; never assume or claim this prerequisite is satisfied.
+Run the primary Codex session on gpt-5.6-sol with high reasoning. Use complete
+host-provided runtime metadata when it exposes both fields for the current session. If
+either field is unavailable, emit the route declaration below before using task tools,
+then inspect the exact current rollout:
+
+~~~sh
+skill_dir=<directory-containing-this-SKILL.md>
+runtime_inspector="$skill_dir/../../scripts/inspect-agent-runtime.sh"
+sh "$runtime_inspector" --primary "$CODEX_THREAD_ID"
+~~~
+
+The inspector reports the latest applied `turn_id`; a UI change made during a running
+turn becomes runtime evidence only after Codex starts and records the next turn.
+
+Continue without prompting when the result verifies exact Sol / High. If the current
+thread ID is unavailable, inspection fails, or either field differs, stop and tell the
+user to select Sol / High before retrying. Do not accept configured defaults, previous
+threads, auxiliary metadata, or manual attestation as active-session evidence. A skill
+cannot change the primary model itself.
 
 ## Declare the route before task tools
 
@@ -38,15 +52,18 @@ justifies another mode. A later declaration may only escalate the route when new
 observed risk justifies it; never silently downgrade. Record the evidence for an
 escalation. Details and the task-scoped preflight matrix are in operations.md.
 
+No local primary-runtime inspection may precede this declaration. When host metadata
+is incomplete, state in `risk` that primary evidence is pending local inspection.
+
 ## Preflight selected auxiliaries only
 
-Confirm Sol / High in the primary session. Preflight only an auxiliary selected by the
-declared route: none for solo; Luna / Max or Terra / High for delegate; fresh Sol / High
-for audit; and the selected implementer plus fresh Sol reviewer for full. Public metadata
-for role, model, and effort is authoritative. If it omits a model or effort, use the
-local inspector only for that omitted field. Missing, conflicting, unavailable, or
-unobservable evidence stops the affected lane; never silently substitute a role,
-model, effort, or reviewer.
+Verify Sol / High in the primary session as described above. Preflight only an
+auxiliary selected by the declared route: none for solo; Luna / Max or Terra / High for
+delegate; fresh Sol / High for audit; and the selected implementer plus fresh Sol
+reviewer for full. Public metadata for the selected auxiliary's role, model, and effort
+is authoritative. If it omits a model or effort, use the local inspector only for that
+omitted field. Missing, conflicting, unavailable, or unobservable evidence stops the
+affected lane; never silently substitute a role, model, effort, or reviewer.
 
 ## Route delivery without duplication
 

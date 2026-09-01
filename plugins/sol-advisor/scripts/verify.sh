@@ -387,6 +387,69 @@ zero_id=22222222-2222-7222-8222-222222222222
 if sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$zero_id" >/dev/null 2>&1; then fail "runtime inspector accepted zero matches"; fi
 pass "runtime inspector Luna/Max routing and safe refusal"
 
+primary_sessions=$tmp_dir/primary-runtime-sessions
+primary_day=$primary_sessions/2026/08/16
+mkdir -p "$primary_day"
+primary_id=33333333-3333-7333-8333-333333333333
+primary_old_turn_id=bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb
+primary_current_turn_id=cccccccc-cccc-7ccc-8ccc-cccccccccccc
+primary_rollout=$primary_day/rollout-2026-08-16T00-00-00-$primary_id.jsonl
+printf '%s\n' \
+  '{"type":"response_item","payload":{"prompt":"PRIMARY_PROMPT_MUST_NOT_LEAK","transcript":"TRANSCRIPT_MUST_NOT_LEAK"}}' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"model_provider\":\"openai\",\"cwd\":\"/old-cwd\"}}" \
+  "{\"type\":\"turn_context\",\"payload\":{\"turn_id\":\"$primary_old_turn_id\",\"model\":\"gpt-5.6-terra\",\"effort\":\"medium\",\"cwd\":\"/old-cwd\"}}" \
+  "{\"type\":\"turn_context\",\"payload\":{\"turn_id\":\"$primary_current_turn_id\",\"model\":\"gpt-5.6-sol\",\"effort\":\"high\",\"cwd\":\"/current-cwd\"}}" \
+  > "$primary_rollout"
+primary_output=$(sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_id")
+printf '%s\n' "$primary_output" | jq -e --arg id "$primary_id" --arg turn_id "$primary_current_turn_id" '
+  keys == ["cwd", "effort", "model", "model_provider", "thread_id", "turn_id"]
+  and .thread_id == $id and .turn_id == $turn_id
+  and .model == "gpt-5.6-sol" and .effort == "high"
+  and .model_provider == "openai" and .cwd == "/current-cwd"
+' >/dev/null || fail "primary inspector returned wrong latest-turn evidence"
+if printf '%s\n' "$primary_output" | grep -Eq 'PRIMARY_PROMPT|TRANSCRIPT|old-cwd|agent_role|agent_path'; then
+  fail "primary inspector leaked non-allowlisted or historical payload"
+fi
+
+primary_mismatch_id=44444444-4444-7444-8444-444444444444
+primary_mismatch_turn_id=dddddddd-dddd-7ddd-8ddd-dddddddddddd
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_mismatch_id\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
+  "{\"type\":\"turn_context\",\"payload\":{\"turn_id\":\"$primary_mismatch_turn_id\",\"model\":\"gpt-5.6-terra\",\"effort\":\"high\",\"cwd\":\"/fixture\"}}" \
+  > "$primary_day/rollout-2026-08-16T00-00-01-$primary_mismatch_id.jsonl"
+if sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_mismatch_id" >/dev/null 2>&1; then
+  fail "primary inspector accepted a model mismatch"
+fi
+
+primary_aux_id=55555555-5555-7555-8555-555555555555
+primary_aux_turn_id=eeeeeeee-eeee-7eee-8eee-eeeeeeeeeeee
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_aux_id\",\"agent_role\":\"sol_advisor_sol_reviewer\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
+  "{\"type\":\"turn_context\",\"payload\":{\"turn_id\":\"$primary_aux_turn_id\",\"model\":\"gpt-5.6-sol\",\"effort\":\"high\",\"cwd\":\"/fixture\"}}" \
+  > "$primary_day/rollout-2026-08-16T00-00-02-$primary_aux_id.jsonl"
+if sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_aux_id" >/dev/null 2>&1; then
+  fail "primary inspector accepted an auxiliary role"
+fi
+
+primary_missing_id=66666666-6666-7666-8666-666666666666
+primary_missing_turn_id=ffffffff-ffff-7fff-8fff-ffffffffffff
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_missing_id\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
+  "{\"type\":\"turn_context\",\"payload\":{\"turn_id\":\"$primary_missing_turn_id\",\"model\":\"gpt-5.6-sol\",\"cwd\":\"/fixture\"}}" \
+  > "$primary_day/rollout-2026-08-16T00-00-03-$primary_missing_id.jsonl"
+if sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_missing_id" >/dev/null 2>&1; then
+  fail "primary inspector accepted missing effort"
+fi
+primary_invalid_turn_id=77777777-7777-7777-8777-777777777777
+printf '%s\n' \
+  "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$primary_invalid_turn_id\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
+  '{"type":"turn_context","payload":{"turn_id":"not-a-uuid","model":"gpt-5.6-sol","effort":"high","cwd":"/fixture"}}' \
+  > "$primary_day/rollout-2026-08-16T00-00-04-$primary_invalid_turn_id.jsonl"
+if sh "$runtime_inspector" --primary --sessions-dir "$primary_sessions" "$primary_invalid_turn_id" >/dev/null 2>&1; then
+  fail "primary inspector accepted an invalid current turn id"
+fi
+pass "primary inspector uses identified latest-turn evidence and fails closed"
+
 for document in "$contracts" "$operations"; do
   grep -Fq 'agent_type: sol_advisor_luna_implementer' "$document" || fail "missing Luna spawn in $document"
   grep -Fq 'agent_type: sol_advisor_terra_implementer' "$document" || fail "missing Terra spawn in $document"
@@ -405,6 +468,9 @@ grep -Fq 'Solo is the default' "$skill" || fail "skill omits solo default"
 grep -Fq 'One auxiliary agent is the default maximum' "$skill" || fail "skill omits auxiliary limit"
 grep -Fq 'A later declaration may only escalate the route when newly' "$skill" || fail "skill omits escalation gate"
 grep -Fq 'never silently downgrade' "$skill" || fail "skill permits silent downgrade"
+grep -Fq -- '--primary "$CODEX_THREAD_ID"' "$skill" || fail "skill omits exact primary runtime inspection"
+grep -Fq 'pending local inspection' "$skill" || fail "skill omits pre-inspection route disclosure"
+grep -Fq 'manual attestation' "$skill" || fail "skill permits unverified primary attestation"
 grep -Fqi 'public metadata' "$skill" || fail "skill lacks public-metadata evidence rule"
 grep -Fqi 'local inspector' "$skill" || fail "skill lacks runtime fallback rule"
 grep -Fqi 'parent captures and verifies exact before-and-after' "$contracts" || fail "contracts lack behavioral read-only state check"

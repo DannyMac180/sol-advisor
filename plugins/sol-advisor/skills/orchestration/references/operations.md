@@ -40,8 +40,9 @@ unobservable role/model/effort is a hard stop; never substitute another role.
 
 ## Selective route declaration, preflight, and caching
 
-The primary session must be Sol / High. Companion installation is separate from task
-routing because plugin installation does not register user-owned TOMLs.
+The primary session must be Sol / High. Verify the active session rather than inferring
+it from configured defaults. Companion installation is separate from task routing
+because plugin installation does not register user-owned TOMLs.
 
 At installation or update time, run the repository-relative installer and its exactness
 check:
@@ -78,6 +79,10 @@ or high-risk exception. The root may emit a later declaration only to escalate w
 newly observed risk justifies it. It records that evidence and never silently
 downgrades.
 
+A local primary-runtime inspection also requires this declaration first. When complete
+host metadata is unavailable, state in the initial `risk` that primary evidence is
+pending local inspection.
+
 The existing --check flag verifies all three roles. For task-scoped preflight, check
 only the auxiliaries selected by the declaration; every check is non-mutating and
 fail-closed:
@@ -111,8 +116,43 @@ for Terra.
 
 If public metadata omits model or effort, use the local inspector below as a fallback
 for those omitted fields only. Do not use it to replace available public evidence.
+This rule applies to auxiliary evidence; primary evidence follows the next section.
 
 ## Runtime routing evidence
+
+### Primary-session evidence
+
+Use complete host-provided runtime metadata when it identifies both the active model
+and effort for the current primary session. If either field is unavailable, resolve
+the helper relative to the installed skill and inspect the exact current thread after
+the route declaration:
+
+~~~sh
+skill_dir=<directory-containing-this-SKILL.md>
+runtime_inspector="$skill_dir/../../scripts/inspect-agent-runtime.sh"
+sh "$runtime_inspector" --primary "$CODEX_THREAD_ID"
+~~~
+
+For a disposable fixture or non-default session root:
+
+~~~sh
+sh "$runtime_inspector" --primary --sessions-dir /absolute/path/to/sessions <primary-thread-id>
+~~~
+
+Primary mode accepts sessions without auxiliary-only `agent_role` metadata and rejects
+sessions that identify an auxiliary role. It reads the latest `turn_context`, emits
+only the thread ID, applied turn ID, model, effort, provider, and working directory,
+and accepts exact `gpt-5.6-sol` / `high` only. The turn ID must be a lowercase UUID. A
+UI change made during a running turn applies only after Codex starts and records the
+next turn. Invalid IDs, zero or multiple rollout matches, missing or malformed fields,
+auxiliary roles, and model or effort mismatches fail closed. It does not expose prompts,
+messages, environment variables, tokens, configuration, or arbitrary rollout payloads.
+
+If host metadata and local inspection cannot verify the requirement, stop. Configured
+defaults, previous threads, auxiliary metadata, and manual attestation do not prove
+the active primary session.
+
+### Auxiliary routing evidence
 
 The public spawn/details record is authoritative for the selected role and any exposed
 model/effort. When model or effort is omitted, resolve the helper relative to the
