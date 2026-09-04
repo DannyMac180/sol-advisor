@@ -44,6 +44,16 @@ legacy_terra_sha256=4425a8c1f21ce8c6af93f96adc253bbc33ea301f1389b3fa8ce350be0858
 legacy_luna_v050_sha256=5cfaf77f14757074ca5d3cfecd0b8204c91dc14eff8d6119985c64416ddf4853
 legacy_terra_v050_sha256=dc329fe87f6f6610c13157ec16432f91c79cf5a541ee3e7448f6afb165dd18ce
 
+test_sha256_file() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 -- "$1" 2>/dev/null
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum -- "$1" 2>/dev/null
+  else
+    fail "verification requires shasum or sha256sum"
+  fi | awk 'NF >= 1 && length($1) == 64 { print $1; exit }'
+}
+
 snapshot_files() {
   target=$1
   if [ ! -d "$target" ]; then
@@ -54,7 +64,7 @@ snapshot_files() {
     if [ -L "$path" ]; then
       printf 'L %s -> %s\n' "$(basename "$path")" "$(readlink "$path")"
     elif [ -f "$path" ]; then
-      shasum -a 256 "$path"
+      test_sha256_file "$path"
     else
       printf 'O %s\n' "$(basename "$path")"
     fi
@@ -102,8 +112,8 @@ level; this installed custom-agent profile is the required complex lane.
 """
 LEGACY_TERRA
   cp "$templates/$sol_file" "$target/$sol_file"
-  [ "$(shasum -a 256 "$target/$luna_file" | awk '{print $1}')" = "$legacy_luna_sha256" ] || fail "legacy Luna fixture digest drifted"
-  [ "$(shasum -a 256 "$target/$terra_file" | awk '{print $1}')" = "$legacy_terra_sha256" ] || fail "legacy Terra fixture digest drifted"
+  [ "$(test_sha256_file "$target/$luna_file")" = "$legacy_luna_sha256" ] || fail "legacy Luna fixture digest drifted"
+  [ "$(test_sha256_file "$target/$terra_file")" = "$legacy_terra_sha256" ] || fail "legacy Terra fixture digest drifted"
 }
 
 write_v050_roles() {
@@ -152,9 +162,155 @@ reasoning level; this installed custom-agent profile is the required escalation 
 """
 V050_TERRA
   cp "$templates/$sol_file" "$target/$sol_file"
-  [ "$(shasum -a 256 "$target/$luna_file" | awk '{print $1}')" = "$legacy_luna_v050_sha256" ] || fail "v0.5.0 Luna fixture digest drifted"
-  [ "$(shasum -a 256 "$target/$terra_file" | awk '{print $1}')" = "$legacy_terra_v050_sha256" ] || fail "v0.5.0 Terra fixture digest drifted"
+  [ "$(test_sha256_file "$target/$luna_file")" = "$legacy_luna_v050_sha256" ] || fail "v0.5.0 Luna fixture digest drifted"
+  [ "$(test_sha256_file "$target/$terra_file")" = "$legacy_terra_v050_sha256" ] || fail "v0.5.0 Terra fixture digest drifted"
 }
+
+write_tool_wrapper() {
+  wrapper_dir=$1
+  tool_name=$2
+  tool_path=$(command -v "$tool_name") || fail "required test tool is unavailable: $tool_name"
+  printf '#!/bin/sh\nexec "%s" "$@"\n' "$tool_path" > "$wrapper_dir/$tool_name"
+  chmod +x "$wrapper_dir/$tool_name"
+}
+
+write_installer_tool_path() {
+  wrapper_dir=$1
+  mkdir -p "$wrapper_dir"
+  for tool_name in awk cmp cp dirname ln mkdir mktemp mv rm; do
+    write_tool_wrapper "$wrapper_dir" "$tool_name"
+  done
+}
+
+write_failing_digest_tool() {
+  wrapper_dir=$1
+  tool_name=$2
+  digest=$3
+  printf '#!/bin/sh\nprintf "%%s\\n" "%s"\nexit 1\n' "$digest" > "$wrapper_dir/$tool_name"
+  chmod +x "$wrapper_dir/$tool_name"
+}
+
+write_shasum_compat_wrapper() {
+  wrapper_dir=$1
+  if shasum_path=$(command -v shasum 2>/dev/null); then
+    printf '#!/bin/sh\nexec "%s" "$@"\n' "$shasum_path" > "$wrapper_dir/shasum"
+  elif sha256sum_path=$(command -v sha256sum 2>/dev/null); then
+    printf '#!/bin/sh\n[ "$#" -eq 4 ] && [ "$1" = -a ] && [ "$2" = 256 ] && [ "$3" = -- ] || exit 2\nexec "%s" -- "$4"\n' "$sha256sum_path" > "$wrapper_dir/shasum"
+  else
+    fail "shasum or sha256sum is required for the shasum compatibility fixture"
+  fi
+  chmod +x "$wrapper_dir/shasum"
+}
+
+write_sha256sum_compat_wrapper() {
+  wrapper_dir=$1
+  if sha256sum_path=$(command -v sha256sum 2>/dev/null); then
+    printf '#!/bin/sh\nexec "%s" "$@"\n' "$sha256sum_path" > "$wrapper_dir/sha256sum"
+  elif shasum_path=$(command -v shasum 2>/dev/null); then
+    printf '#!/bin/sh\n[ "$#" -eq 2 ] && [ "$1" = -- ] || exit 2\nexec "%s" -a 256 -- "$2"\n' "$shasum_path" > "$wrapper_dir/sha256sum"
+  else
+    fail "shasum or sha256sum is required for the sha256sum compatibility fixture"
+  fi
+  chmod +x "$wrapper_dir/sha256sum"
+}
+
+macos_source_bin=$tmp_dir/macos-shasum-source-bin
+mkdir -p "$macos_source_bin"
+write_shasum_compat_wrapper "$macos_source_bin"
+write_tool_wrapper "$macos_source_bin" chmod
+macos_fixture_bin=$tmp_dir/macos-shasum-fixture-bin
+write_installer_tool_path "$macos_fixture_bin"
+[ -n "$(PATH="$macos_source_bin:$macos_fixture_bin" command -v shasum 2>/dev/null)" ] || fail "macOS-equivalent fixture does not expose shasum"
+[ -z "$(PATH="$macos_source_bin:$macos_fixture_bin" command -v sha256sum 2>/dev/null)" ] || fail "macOS-equivalent fixture unexpectedly exposes sha256sum"
+PATH="$macos_source_bin:$macos_fixture_bin" write_shasum_compat_wrapper "$macos_fixture_bin"
+macos_target=$tmp_dir/macos-shasum-only-target
+write_v050_roles "$macos_target"
+cp "$templates/$luna_file" "$macos_target/$luna_file"
+shell_path=$(command -v sh) || fail "sh is unavailable"
+PATH="$macos_fixture_bin" "$shell_path" "$installer" --target-dir "$macos_target"
+cmp -s "$templates/$terra_file" "$macos_target/$terra_file" || fail "shasum-only installer did not migrate Terra"
+cmp -s "$templates/$luna_file" "$macos_target/$luna_file" || fail "shasum-only installer changed Luna"
+cmp -s "$templates/$sol_file" "$macos_target/$sol_file" || fail "shasum-only installer changed Sol"
+macos_fallback_bin=$tmp_dir/macos-shasum-source-fallback-bin
+write_installer_tool_path "$macos_fallback_bin"
+PATH="$macos_source_bin:$macos_fallback_bin" write_sha256sum_compat_wrapper "$macos_fallback_bin"
+[ -z "$(PATH="$macos_fallback_bin" command -v shasum 2>/dev/null)" ] || fail "macOS-equivalent fallback fixture unexpectedly exposes shasum"
+[ -n "$(PATH="$macos_fallback_bin" command -v sha256sum 2>/dev/null)" ] || fail "macOS-equivalent fallback fixture does not expose sha256sum"
+macos_fallback_target=$tmp_dir/macos-shasum-source-fallback-target
+write_v050_roles "$macos_fallback_target"
+cp "$templates/$luna_file" "$macos_fallback_target/$luna_file"
+PATH="$macos_fallback_bin" "$shell_path" "$installer" --target-dir "$macos_fallback_target"
+cmp -s "$templates/$terra_file" "$macos_fallback_target/$terra_file" || fail "shasum-only host could not build the sha256sum fallback fixture"
+cmp -s "$templates/$luna_file" "$macos_fallback_target/$luna_file" || fail "macOS-equivalent fallback changed Luna"
+cmp -s "$templates/$sol_file" "$macos_fallback_target/$sol_file" || fail "macOS-equivalent fallback changed Sol"
+pass "macOS-equivalent shasum-only fixture and installer behavior"
+
+fallback_bin=$tmp_dir/fallback-bin
+write_installer_tool_path "$fallback_bin"
+write_sha256sum_compat_wrapper "$fallback_bin"
+[ -z "$(PATH="$fallback_bin" command -v shasum 2>/dev/null)" ] || fail "fallback fixture unexpectedly exposes shasum"
+[ -n "$(PATH="$fallback_bin" command -v sha256sum 2>/dev/null)" ] || fail "fallback fixture does not expose sha256sum"
+fallback_target=$tmp_dir/日本語-digest-backend
+write_v050_roles "$fallback_target"
+cp "$templates/$luna_file" "$fallback_target/$luna_file"
+printf '%s\n' 'unrelated fixture' > "$fallback_target/unrelated-agent.toml"
+fallback_luna_before=$(test_sha256_file "$fallback_target/$luna_file")
+fallback_sol_before=$(test_sha256_file "$fallback_target/$sol_file")
+fallback_unrelated_before=$(test_sha256_file "$fallback_target/unrelated-agent.toml")
+PATH="$fallback_bin" "$shell_path" "$installer" --target-dir "$fallback_target"
+cmp -s "$templates/$terra_file" "$fallback_target/$terra_file" || fail "sha256sum fallback did not migrate Unicode-path Terra"
+[ "$(test_sha256_file "$fallback_target/$luna_file")" = "$fallback_luna_before" ] || fail "Unicode-path fallback changed Luna"
+[ "$(test_sha256_file "$fallback_target/$sol_file")" = "$fallback_sol_before" ] || fail "Unicode-path fallback changed Sol"
+[ "$(test_sha256_file "$fallback_target/unrelated-agent.toml")" = "$fallback_unrelated_before" ] || fail "Unicode-path fallback changed unrelated agent fixture"
+pass "non-login sha256sum fallback migrates only Unicode-path Terra"
+
+ascii_fallback_target=$tmp_dir/ascii-digest-backend
+write_v050_roles "$ascii_fallback_target"
+cp "$templates/$luna_file" "$ascii_fallback_target/$luna_file"
+PATH="$fallback_bin" "$shell_path" "$installer" --target-dir "$ascii_fallback_target"
+cmp -s "$templates/$terra_file" "$ascii_fallback_target/$terra_file" || fail "sha256sum fallback did not migrate ASCII-path Terra"
+cmp -s "$templates/$luna_file" "$ascii_fallback_target/$luna_file" || fail "ASCII-path fallback changed Luna"
+cmp -s "$templates/$sol_file" "$ascii_fallback_target/$sol_file" || fail "ASCII-path fallback changed Sol"
+pass "non-login sha256sum fallback preserves ASCII-path installer behavior"
+
+shasum_bin=$tmp_dir/shasum-bin
+write_installer_tool_path "$shasum_bin"
+write_shasum_compat_wrapper "$shasum_bin"
+write_failing_digest_tool "$shasum_bin" sha256sum "$legacy_terra_v050_sha256"
+shasum_target=$tmp_dir/ascii-shasum-backend
+write_v050_roles "$shasum_target"
+cp "$templates/$luna_file" "$shasum_target/$luna_file"
+PATH="$shasum_bin" "$shell_path" "$installer" --target-dir "$shasum_target"
+cmp -s "$templates/$terra_file" "$shasum_target/$terra_file" || fail "available shasum backend did not migrate Terra"
+pass "available shasum remains the preferred digest backend"
+
+no_digest_bin=$tmp_dir/no-digest-bin
+write_installer_tool_path "$no_digest_bin"
+no_digest_target=$tmp_dir/no-digest-target
+write_v050_roles "$no_digest_target"
+cp "$templates/$luna_file" "$no_digest_target/$luna_file"
+no_digest_before=$(snapshot_files "$no_digest_target")
+if PATH="$no_digest_bin" "$shell_path" "$installer" --target-dir "$no_digest_target" >"$tmp_dir/no-digest.out" 2>&1; then
+  fail "installer accepted a legacy destination without a digest backend"
+fi
+grep -Fq 'Terra destination is unreadable' "$tmp_dir/no-digest.out" || fail "missing-backend refusal was not classified as unreadable"
+[ "$(snapshot_files "$no_digest_target")" = "$no_digest_before" ] || fail "missing-backend refusal changed destination files"
+pass "missing digest backends fail closed without mutation"
+
+failing_shasum_bin=$tmp_dir/failing-shasum-bin
+write_installer_tool_path "$failing_shasum_bin"
+write_failing_digest_tool "$failing_shasum_bin" shasum "$legacy_terra_v050_sha256"
+write_sha256sum_compat_wrapper "$failing_shasum_bin"
+failing_shasum_target=$tmp_dir/failing-shasum-target
+write_v050_roles "$failing_shasum_target"
+cp "$templates/$luna_file" "$failing_shasum_target/$luna_file"
+failing_shasum_before=$(snapshot_files "$failing_shasum_target")
+if PATH="$failing_shasum_bin" "$shell_path" "$installer" --target-dir "$failing_shasum_target" >"$tmp_dir/failing-shasum.out" 2>&1; then
+  fail "installer accepted output from the failed selected shasum backend"
+fi
+grep -Fq 'Terra destination is unreadable' "$tmp_dir/failing-shasum.out" || fail "selected-backend failure was not classified as unreadable"
+[ "$(snapshot_files "$failing_shasum_target")" = "$failing_shasum_before" ] || fail "selected-backend failure changed destination files"
+pass "selected shasum failure does not fall back and remains non-mutating"
 
 for required in "$installer" "$runtime_inspector" "$manifest" "$skill" "$contracts" "$operations" "$readme" "$ui"; do
   test -f "$required" || fail "required file missing: $required"

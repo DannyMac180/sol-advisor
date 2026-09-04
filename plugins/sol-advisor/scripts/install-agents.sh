@@ -50,8 +50,28 @@ path_exists() {
   [ -e "$1" ] || [ -L "$1" ]
 }
 
+if command -v shasum >/dev/null 2>&1; then
+  sha256_backend=shasum
+elif command -v sha256sum >/dev/null 2>&1; then
+  sha256_backend=sha256sum
+else
+  sha256_backend=unavailable
+fi
+
 sha256_file() {
-  shasum -a 256 "$1" 2>/dev/null | awk 'NF >= 1 && length($1) == 64 { print $1; exit }'
+  sha256_output=''
+  case "$sha256_backend" in
+    shasum)
+      sha256_output=$(shasum -a 256 -- "$1" 2>/dev/null) || return 0
+      ;;
+    sha256sum)
+      sha256_output=$(sha256sum -- "$1" 2>/dev/null) || return 0
+      ;;
+    unavailable)
+      return 0
+      ;;
+  esac
+  printf '%s\n' "$sha256_output" | awk 'NF >= 1 && length($1) == 64 { print $1; exit }'
 }
 
 classify_current_or_legacy() {
