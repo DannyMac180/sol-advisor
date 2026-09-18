@@ -81,3 +81,9 @@ cd /absolute/path/to/sol-advisor
 codex plugin marketplace add /absolute/path/to/sol-advisor
 codex plugin add sol-advisor@sol-advisor
 ~~~
+
+## Included Roblox game
+
+This repository also contains a standalone Rojo/Luau game template, **Neon
+Courier**. See [ROBLOX_GAME.md](ROBLOX_GAME.md) for setup, publishing, and the
+optional Developer Product configuration.
