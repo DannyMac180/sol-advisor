@@ -13,9 +13,11 @@ I write [**Attention Heads**](https://attentionheads.substack.com/?utm_source=gi
 
 ## Quick start
 
-You need a current Codex CLI or ChatGPT desktop app with plugins enabled, GPT-5.6
-Sol / High for the primary session, native custom-agent support, and jq. GPT-5.6
+You need a current Codex CLI or ChatGPT desktop app with plugins enabled, GPT-6.1
+Sol / High for the primary session, native custom-agent support, and jq. GPT-6
 Luna / Max or Terra / High access is needed only when the selected route delegates.
+Terra is the retained role name for GPT-6 Sol / High. Primary and fresh review
+sessions use GPT-6.1 Sol / High.
 
 ~~~sh
 codex plugin marketplace add DannyMac180/sol-advisor --ref main

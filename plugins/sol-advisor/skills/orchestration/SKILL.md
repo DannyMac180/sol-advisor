@@ -15,9 +15,13 @@ Read [references/role-contracts.md](references/role-contracts.md) before the fir
 delegation. Use [references/operations.md](references/operations.md) for exact spawn,
 preflight, runtime-evidence, isolation, and maintainer procedures.
 
+The primary session and fresh Sol reviewer use `gpt-6.1-sol` / `high`.
+Luna uses `gpt-6-luna` / `max`. Terra is the retained complex-work role name
+and uses `gpt-6-sol` / `high`; it does not select a Terra model.
+
 ## Confirm the primary session
 
-Run the primary Codex session on gpt-5.6-sol with high reasoning. Verify the current
+Run the primary Codex session on gpt-6.1-sol with high reasoning. Verify the current
 model and effort when runtime metadata exposes them. If either differs, tell the user
 to select Sol / High and stop before delegation. If runtime metadata does not expose
 them, ask the user to confirm Sol / High and stop until confirmed. A skill cannot

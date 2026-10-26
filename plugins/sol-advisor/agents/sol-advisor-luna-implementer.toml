@@ -1,6 +1,6 @@
 name = "sol_advisor_luna_implementer"
 description = "Sol Advisor's default routine implementation lane for bounded, fully specified work."
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 model_reasoning_effort = "max"
 
 developer_instructions = """

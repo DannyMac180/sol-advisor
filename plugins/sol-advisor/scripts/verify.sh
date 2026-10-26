@@ -166,8 +166,8 @@ jq empty "$manifest"
 [ "$(jq -r '.version' "$manifest")" = 0.6.0 ] || fail "manifest version is not 0.6.0"
 grep -Fq 'SELECTIVE ROUTE' "$manifest" || fail "manifest omits route declaration"
 grep -Fq 'solo is the default' "$manifest" || fail "manifest omits solo default"
-grep -Fq 'delegate uses native GPT-5.6 Luna / Max' "$manifest" || fail "manifest omits delegate role contract"
-grep -Fq 'audit uses a fresh read-only GPT-5.6 Sol / High review' "$manifest" || fail "manifest omits audit contract"
+grep -Fq 'delegate uses native GPT-6 Luna / Max' "$manifest" || fail "manifest omits delegate role contract"
+grep -Fq 'audit uses a fresh read-only GPT-6.1 Sol / High review' "$manifest" || fail "manifest omits audit contract"
 grep -Fq 'full combines one selected implementer' "$manifest" || fail "manifest omits exceptional full contract"
 grep -Fq 'fails closed' "$manifest" || fail "manifest omits fail-closed evidence rule"
 pass "manifest JSON, v0.6.0 release, and selective-routing language"
@@ -181,17 +181,17 @@ root = Path(sys.argv[1])
 expected = {
     "sol-advisor-luna-implementer.toml": {
         "name": "sol_advisor_luna_implementer",
-        "model": "gpt-5.6-luna",
+        "model": "gpt-6-luna",
         "model_reasoning_effort": "max",
     },
     "sol-advisor-terra-implementer.toml": {
         "name": "sol_advisor_terra_implementer",
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6-sol",
         "model_reasoning_effort": "high",
     },
     "sol-advisor-sol-reviewer.toml": {
         "name": "sol_advisor_sol_reviewer",
-        "model": "gpt-5.6-sol",
+        "model": "gpt-6.1-sol",
         "model_reasoning_effort": "high",
         "sandbox_mode": "read-only",
     },
@@ -216,6 +216,41 @@ grep -Fq "legacy_terra_sha256=$legacy_terra_sha256" "$installer" || fail "instal
 grep -Fq "legacy_luna_v050_sha256=$legacy_luna_v050_sha256" "$installer" || fail "installer v0.5.0 Luna digest mismatch"
 grep -Fq "legacy_terra_v050_sha256=$legacy_terra_v050_sha256" "$installer" || fail "installer v0.5.0 Terra digest mismatch"
 pass "immutable historical migration fingerprints"
+
+# Reconstruct the exact upstream v0.6.0 files; only the model pins changed.
+write_v060_roles() {
+  target=$1
+  mkdir -p "$target"
+  sed 's/gpt-6-luna/gpt-5.6-luna/' "$templates/$luna_file" > "$target/$luna_file"
+  sed 's/gpt-6-sol/gpt-5.6-terra/' "$templates/$terra_file" > "$target/$terra_file"
+  sed 's/gpt-6.1-sol/gpt-5.6-sol/' "$templates/$sol_file" > "$target/$sol_file"
+  for entry in \
+    "$luna_file:12fa9180a292876e6731bc325779123bcd931c3caa902fbf90d676a31833be84" \
+    "$terra_file:77ed2f36bb149da5d9032230c3d6f5e5cd56b059b3fa5f59085249bba06e1f3a" \
+    "$sol_file:0333acf0ef562bcfebd06009ac09bd1dd8cbc04c4cf28e08e9e049bd8bf202d2"; do
+    [ "$(shasum -a 256 "$target/${entry%%:*}" | awk '{print $1}')" = "${entry#*:}" ] ||
+      fail "v0.6.0 fixture digest drifted: ${entry%%:*}"
+  done
+}
+
+v060_target=$tmp_dir/v060
+write_v060_roles "$v060_target"
+before=$(snapshot_files "$v060_target")
+if sh "$installer" --target-dir "$v060_target" --check; then fail "check accepted old model pins"; fi
+[ "$before" = "$(snapshot_files "$v060_target")" ] || fail "v0.6.0 check mutated roles"
+sh "$installer" --target-dir "$v060_target"
+sh "$installer" --target-dir "$v060_target" --check
+pass "byte-exact v0.6.0 three-role migration and non-mutating check"
+
+for role in "$luna_file" "$terra_file" "$sol_file"; do
+  modified_v060=$tmp_dir/modified-v060-$role
+  write_v060_roles "$modified_v060"
+  printf '\n# user customization\n' >> "$modified_v060/$role"
+  before=$(snapshot_files "$modified_v060")
+  if sh "$installer" --target-dir "$modified_v060"; then fail "migrated customized v0.6.0 role: $role"; fi
+  [ "$before" = "$(snapshot_files "$modified_v060")" ] || fail "customized v0.6.0 refusal partially mutated roles"
+done
+pass "customized v0.6.0 roles refused with zero partial mutation"
 
 clean_target=$tmp_dir/clean
 sh "$installer" --target-dir "$clean_target"
@@ -372,12 +407,12 @@ runtime_rollout=$runtime_day/rollout-2026-08-15T00-00-00-$runtime_id.jsonl
 printf '%s\n' \
   '{"type":"response_item","payload":{"prompt":"DO_NOT_LEAK_PROMPT"}}' \
   "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$runtime_id\",\"parent_thread_id\":\"00000000-0000-7000-8000-000000000000\",\"agent_role\":\"sol_advisor_luna_implementer\",\"agent_path\":\"/root/fixture\",\"model_provider\":\"openai\",\"cwd\":\"/fixture\"}}" \
-  '{"type":"turn_context","payload":{"model":"gpt-5.6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
+  '{"type":"turn_context","payload":{"model":"gpt-6-luna","effort":"max","sandbox_policy":{"type":"danger-full-access"},"permission_profile":{"type":"disabled"},"cwd":"/fixture"}}' \
   > "$runtime_rollout"
 runtime_output=$(sh "$runtime_inspector" --sessions-dir "$runtime_sessions" "$runtime_id")
 printf '%s\n' "$runtime_output" | jq -e --arg id "$runtime_id" '
   .thread_id == $id and .agent_role == "sol_advisor_luna_implementer"
-  and .model == "gpt-5.6-luna" and .effort == "max"
+  and .model == "gpt-6-luna" and .effort == "max"
   and .sandbox_policy_type == "danger-full-access"
   and .permission_profile_type == "disabled"
 ' >/dev/null || fail "runtime inspector returned wrong Luna/Max evidence"

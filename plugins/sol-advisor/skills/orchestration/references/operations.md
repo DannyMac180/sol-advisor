@@ -10,9 +10,14 @@ The installed TOMLs are the source of truth:
 
 | Role type | Model | Effort | Use |
 |---|---|---|---|
-| sol_advisor_luna_implementer | gpt-5.6-luna | max | Delegate/full bounded routine implementation |
-| sol_advisor_terra_implementer | gpt-5.6-terra | high | Delegate/full judgment-heavy or high-risk implementation |
-| sol_advisor_sol_reviewer | gpt-5.6-sol | high | Audit/full fresh review; requests read-only sandbox |
+| sol_advisor_luna_implementer | gpt-6-luna | max | Delegate/full bounded routine implementation |
+| sol_advisor_terra_implementer | gpt-6-sol | high | Delegate/full judgment-heavy or high-risk implementation |
+| sol_advisor_sol_reviewer | gpt-6.1-sol | high | Audit/full fresh review; requests read-only sandbox |
+
+Terra remains the stable role identifier and lane label for the GPT-6 Sol
+implementer. Sol denotes GPT-6.1 Sol for the primary session and fresh reviewer.
+The installer also recognizes only the byte-exact upstream v0.6.0 profiles for
+this model migration; historical fingerprints remain immutable.
 
 Native spawn requests name the role and use a fresh context:
 
